@@ -30,11 +30,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="tr" className={inter.variable} suppressHydrationWarning>
-      <head>
-        {/* Inline script: apply dark class before first paint to avoid flash */}
-        <script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='dark')document.documentElement.classList.add('dark');}catch(e){}})();` }} />
-      </head>
       <body className="font-sans antialiased">
+        <script
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='dark')document.documentElement.classList.add('dark');}catch(e){}})();`,
+          }}
+        />
         {children}
         <Analytics />
       </body>
