@@ -30,13 +30,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="tr" className={inter.variable} suppressHydrationWarning>
-      <body className="font-sans antialiased">
-        <script
-          suppressHydrationWarning
-          dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='dark')document.documentElement.classList.add('dark');}catch(e){}})();`,
-          }}
-        />
+      <body className="font-sans antialiased" suppressHydrationWarning>
         {children}
         <Analytics />
       </body>
