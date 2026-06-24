@@ -5,7 +5,7 @@ import { neon } from "@neondatabase/serverless"
 
 async function connectDB() {
   if (mongoose.connection.readyState >= 1) return
-  await mongoose.connect(process.env.MONGODB_URI!, {
+  await mongoose.connect(process.env.MONGODB_URI || process.env.MONGODB_CONNECTION_STRING!, {
     dbName: "fonbet",
     bufferCommands: false,
   })
@@ -13,7 +13,7 @@ async function connectDB() {
 
 export async function GET(req: NextRequest) {
   try {
-  if (!process.env.MONGODB_URI) {
+  if (!process.env.MONGODB_URI || process.env.MONGODB_CONNECTION_STRING) {
     return NextResponse.json({ success: false, message: "Sunucu yapılandırma hatası: MONGODB_URI tanımlı değil." }, { status: 500 })
   }
 
