@@ -82,10 +82,6 @@ export async function POST(req: NextRequest) {
 
     const hashedPassword = await bcrypt.hash(password, 12)
 
-    // Ensure columns exist
-    await sql`ALTER TABLE affiliate_applications ADD COLUMN IF NOT EXISTS telegram TEXT`
-    await sql`ALTER TABLE affiliate_applications ADD COLUMN IF NOT EXISTS teams TEXT`
-
     await sql`
       INSERT INTO affiliate_applications
         (username, password, name, email, website_url, country, currency, telegram, teams, status)
