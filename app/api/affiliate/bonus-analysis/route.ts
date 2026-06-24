@@ -13,6 +13,10 @@ async function connectDB() {
 
 export async function GET(req: NextRequest) {
   try {
+  if (!process.env.MONGODB_URI) {
+    return NextResponse.json({ success: false, message: "Sunucu yapılandırma hatası: MONGODB_URI tanımlı değil." }, { status: 500 })
+  }
+
   const auth = await requireAuth(req)
   if ("error" in auth) return auth.error
   const { session } = auth
@@ -21,10 +25,6 @@ export async function GET(req: NextRequest) {
   const isPartner  = session.role === "partner"
   if (!isAdmin && !isPartner) {
     return NextResponse.json({ success: false, message: "Yetkisiz erişim." }, { status: 403 })
-  }
-
-  if (!process.env.MONGODB_URI) {
-    return NextResponse.json({ success: false, message: "Sunucu yapılandırma hatası: MONGODB_URI tanımlı değil." }, { status: 500 })
   }
 
   const { searchParams } = new URL(req.url)
