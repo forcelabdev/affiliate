@@ -81,8 +81,14 @@ export default function BonusAnalysisPage() {
       if (search) params.set("search", search)
 
       const res  = await fetch(`/api/affiliate/bonus-analysis?${params}`, { headers: { "x-auth-token": token } })
-      const data = await res.json()
-      if (data.success) {
+      let data: any = null
+      try {
+        data = await res.json()
+      } catch {
+        // boş veya geçersiz JSON — sessizce çık
+        return
+      }
+      if (data?.success) {
         setPartners(data.partners)
         setSummary(data.summary)
         // auto-expand all partners

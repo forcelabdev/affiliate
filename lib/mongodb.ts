@@ -2,7 +2,7 @@
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const mongoose = require("mongoose") as typeof import("mongoose")
 
-const URI = process.env.MONGODB_URI || ""
+const URI = process.env.MONGODB_URI || process.env.MONGODB_CONNECTION_STRING || ""
 
 const g = global as typeof globalThis & {
   _mConn?: typeof mongoose

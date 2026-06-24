@@ -5,13 +5,18 @@ import { neon } from "@neondatabase/serverless"
 
 async function connectDB() {
   if (mongoose.connection.readyState >= 1) return
-  await mongoose.connect(process.env.MONGODB_URI!, {
+  await mongoose.connect(process.env.MONGODB_URI || process.env.MONGODB_CONNECTION_STRING!, {
     dbName: "fonbet",
     bufferCommands: false,
   })
 }
 
 export async function GET(req: NextRequest) {
+  try {
+  if (!process.env.MONGODB_URI || process.env.MONGODB_CONNECTION_STRING) {
+    return NextResponse.json({ success: false, message: "Sunucu yapılandırma hatası: MONGODB_URI tanımlı değil." }, { status: 500 })
+  }
+
   const auth = await requireAuth(req)
   if ("error" in auth) return auth.error
   const { session } = auth
@@ -162,4 +167,8 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({ success: true, partners, summary })
+  } catch (err: any) {
+    console.error("[bonus-analysis] Unhandled error:", err)
+    return NextResponse.json({ success: false, message: err?.message ?? "Sunucu hatası oluştu." }, { status: 500 })
+  }
 }
