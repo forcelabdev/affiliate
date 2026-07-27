@@ -45,6 +45,7 @@ export async function GET(req: NextRequest) {
 
   await connectDB()
   const db        = mongoose.connection.db!
+  console.log("[v0] Player analysis - Connected to DB:", db.databaseName)
   const usersCol  = db.collection("users")
   const txnCol    = db.collection("transactions")
   const gamesCol  = db.collection("games")
