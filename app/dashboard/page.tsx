@@ -142,7 +142,7 @@ export default function DashboardPage() {
         setRole(r)
         if (typeof parsed.commissionRate === "number") setCommissionRate(parsed.commissionRate)
         if (parsed.commissionType) setCommissionType(parsed.commissionType)
-        if (code) setRefLink(`https://velobet280.com/register?a=${code}`)
+        if (code) setRefLink(`https://bizzocazino.com/register?a=${code}`)
         // If no refCode and not admin/superadmin, force re-login
         if (!code && r !== "admin" && r !== "superadmin") {
           localStorage.removeItem("affiliate_token")
@@ -193,7 +193,7 @@ export default function DashboardPage() {
         })
         if (s.commissionRate) setCommissionRate(s.commissionRate)
         setRefCode(code)
-        setRefLink(`https://velobet280.com/register?a=${code}`)
+        setRefLink(`https://bizzocazino.com/register?a=${code}`)
       }
 
       // API { success, data: [...] } döndürür
@@ -215,7 +215,7 @@ export default function DashboardPage() {
   }
 
   function copyRefLink() {
-    const link = refLink || `https://velobet280.com/register?a=${refCode || userId}`
+    const link = refLink || `https://bizzocazino.com/register?a=${refCode || userId}`
     navigator.clipboard.writeText(link)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
@@ -261,7 +261,7 @@ export default function DashboardPage() {
     )
   }
 
-  const displayLink = refLink || (refCode ? `https://velobet280.com/register?a=${refCode}` : "")
+  const displayLink = refLink || (refCode ? `https://bizzocazino.com/register?a=${refCode}` : "")
 
   return (
     <div className="flex flex-col gap-6 max-w-6xl mx-auto">
@@ -302,7 +302,7 @@ export default function DashboardPage() {
           <div className="flex-1">
             <p className="text-sm font-semibold text-foreground">Referans Linkiniz</p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              velobet280.com — Komisyon:{" "}
+              Bizzocazino — Komisyon:{" "}
               <span className="font-semibold text-primary">{commissionRate}%</span>{" "}
               ({commissionType === "net" ? "Net kazanç bazlı" : "Deposit bazlı"})
             </p>
