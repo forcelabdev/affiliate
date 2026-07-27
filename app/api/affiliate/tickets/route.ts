@@ -59,7 +59,7 @@ async function connectDB() {
   const uri = process.env.MONGODB_URI || process.env.MONGODB_CONNECTION_STRING
   if (!uri) throw new Error("MONGODB_URI not set")
   await mongoose.connect(uri, {
-    dbName: "fonbet",
+    dbName: "bizzocazino",
     bufferCommands: false,
     serverSelectionTimeoutMS: 30000,
     connectTimeoutMS: 30000,

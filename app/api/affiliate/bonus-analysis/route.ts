@@ -6,7 +6,7 @@ import { neon } from "@neondatabase/serverless"
 async function connectDB() {
   if (mongoose.connection.readyState >= 1) return
   await mongoose.connect(process.env.MONGODB_URI || process.env.MONGODB_CONNECTION_STRING!, {
-    dbName: "fonbet",
+    dbName: "bizzocazino",
     bufferCommands: false,
   })
 }

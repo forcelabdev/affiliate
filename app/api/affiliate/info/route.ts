@@ -6,7 +6,7 @@ async function connectDB() {
   if (mongoose.connection.readyState === 1 && mongoose.connection.db) return
   const uri = process.env.MONGODB_URI || process.env.MONGODB_CONNECTION_STRING
   if (!uri) throw new Error("MONGODB_URI not set")
-  await mongoose.connect(uri, { dbName: "fonbet", bufferCommands: false, serverSelectionTimeoutMS: 30000, connectTimeoutMS: 30000, family: 4 })
+  await mongoose.connect(uri, { dbName: "bizzocazino", bufferCommands: false, serverSelectionTimeoutMS: 30000, connectTimeoutMS: 30000, family: 4 })
   if (!mongoose.connection.db) await new Promise<void>((r) => mongoose.connection.once("connected", () => r()))
 }
 
