@@ -1,15 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/api-auth"
 import mongoose from "mongoose"
+import { connectDB } from "@/lib/connectDB"
 import { neon } from "@neondatabase/serverless"
-
-async function connectDB() {
-  if (mongoose.connection.readyState >= 1) return
-  await mongoose.connect(process.env.MONGODB_URI || process.env.MONGODB_CONNECTION_STRING!, {
-    dbName: "bizzocazino",
-    bufferCommands: false,
-  })
-}
 
 export async function GET(req: NextRequest) {
   try {
