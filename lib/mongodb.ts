@@ -10,7 +10,15 @@ const g = global as typeof globalThis & {
 }
 
 export async function connectDB() {
-  if (mongoose.connection.readyState === 1) return mongoose
+  // Bağlı ama yanlış database ise cache'i sıfırla
+  if (
+    mongoose.connection.readyState === 1 &&
+    mongoose.connection.db?.databaseName !== "bizzocazino"
+  ) {
+    g._mProm = undefined
+    g._mConn = undefined
+  }
+  if (mongoose.connection.readyState === 1 && mongoose.connection.db?.databaseName === "bizzocazino") return mongoose
   if (!g._mProm) {
     g._mProm = mongoose
       .connect(URI, { dbName: "bizzocazino", bufferCommands: false, serverSelectionTimeoutMS: 30000, connectTimeoutMS: 30000, family: 4 })
