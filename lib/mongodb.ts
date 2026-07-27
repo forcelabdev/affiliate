@@ -13,7 +13,7 @@ export async function connectDB() {
   if (mongoose.connection.readyState === 1) return mongoose
   if (!g._mProm) {
     g._mProm = mongoose
-      .connect(URI, { dbName: "fonbet", bufferCommands: false, serverSelectionTimeoutMS: 30000, connectTimeoutMS: 30000, family: 4 })
+      .connect(URI, { dbName: "bizzocasino", bufferCommands: false, serverSelectionTimeoutMS: 30000, connectTimeoutMS: 30000, family: 4 })
       .then((m) => { console.log("[v0] MongoDB connected"); g._mConn = m; return m })
       .catch((e) => { g._mProm = undefined; throw e })
   }
