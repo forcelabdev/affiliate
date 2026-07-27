@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, Suspense } from "react"
-import Image from "next/image"
 import { useRouter, useSearchParams } from "next/navigation"
 
 function LoginContent() {
@@ -113,8 +112,8 @@ function LoginContent() {
         <div className="w-full max-w-md">
           {/* Logo */}
           <div className="text-center mb-8">
-            <h1 className="text-5xl font-black tracking-widest text-[#0a0f1a] uppercase select-none">
-              VELO<span className="text-[#00d4b4]">BET</span>
+            <h1 className="text-4xl font-black tracking-wider text-[#0a0f1a] uppercase select-none">
+              BIZZO <span className="text-[#f5c842]">CASINO</span>
             </h1>
             <p className="text-xs text-gray-400 tracking-[0.3em] mt-1 uppercase">Affiliate Panel</p>
           </div>
@@ -139,7 +138,7 @@ function LoginContent() {
               <button
                 onClick={() => setActiveTab("login")}
                 className={`text-lg font-semibold transition-colors ${
-                  activeTab === "login" ? "text-[#00d4b4]" : "text-gray-400 hover:text-gray-600"
+                  activeTab === "login" ? "text-[#f5c842]" : "text-gray-400 hover:text-gray-600"
                 }`}
               >
                 Oturum Aç
@@ -148,7 +147,7 @@ function LoginContent() {
               <button
                 onClick={() => setActiveTab("register")}
                 className={`text-lg font-semibold transition-colors ${
-                  activeTab === "register" ? "text-[#00d4b4]" : "text-gray-400 hover:text-gray-600"
+                  activeTab === "register" ? "text-[#f5c842]" : "text-gray-400 hover:text-gray-600"
                 }`}
               >
                 Kayıt
@@ -167,7 +166,7 @@ function LoginContent() {
                     placeholder="Kullanıcı Adı *"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    className="w-full bg-transparent border-0 border-b border-gray-300 px-0 py-3 text-gray-900 text-base placeholder:text-gray-400 placeholder:text-sm focus:outline-none focus:border-[#00d4b4] transition-colors"
+                    className="w-full bg-transparent border-0 border-b border-gray-300 px-0 py-3 text-gray-900 text-base placeholder:text-gray-400 placeholder:text-sm focus:outline-none focus:border-[#f5c842] transition-colors"
                   />
                 </div>
 
@@ -181,7 +180,7 @@ function LoginContent() {
                     placeholder="Şifre *"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full bg-transparent border-0 border-b border-gray-300 px-0 py-3 pr-10 text-gray-900 text-base placeholder:text-gray-400 placeholder:text-sm focus:outline-none focus:border-[#00d4b4] transition-colors"
+                    className="w-full bg-transparent border-0 border-b border-gray-300 px-0 py-3 pr-10 text-gray-900 text-base placeholder:text-gray-400 placeholder:text-sm focus:outline-none focus:border-[#f5c842] transition-colors"
                   />
                   <button
                     type="button"
@@ -218,7 +217,7 @@ function LoginContent() {
                         className="sr-only"
                       />
                       <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
-                        rememberMe ? "bg-[#00d4b4] border-[#00d4b4]" : "border-gray-300"
+                        rememberMe ? "bg-[#f5c842] border-[#f5c842]" : "border-gray-300"
                       }`}>
                         {rememberMe && (
                           <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
@@ -229,7 +228,7 @@ function LoginContent() {
                     </div>
                     <span className="text-sm text-gray-700">Beni Hatırla</span>
                   </label>
-                  <button type="button" className="text-sm text-[#00d4b4] hover:text-[#00b89c] transition-colors">
+                  <button type="button" className="text-sm text-[#f5c842] hover:text-[#e8b82e] transition-colors">
                     Şifremi Unuttum?
                   </button>
                 </div>
@@ -238,7 +237,7 @@ function LoginContent() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="mt-2 bg-[#00d4b4] hover:bg-[#00b89c] text-white font-semibold rounded-xl py-3 text-sm uppercase tracking-wide transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 w-fit px-8"
+                  className="mt-2 bg-[#f5c842] hover:bg-[#e8b82e] text-white font-semibold rounded-xl py-3 text-sm uppercase tracking-wide transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 w-fit px-8"
                 >
                   {loading ? (
                     <>
@@ -266,7 +265,7 @@ function LoginContent() {
                 <p className="text-sm text-gray-500">Yönetici başvurunuzu inceledikten sonra giriş yapabileceksiniz.</p>
                 <button
                   onClick={() => { setRegSuccess(false); setActiveTab("login") }}
-                  className="text-sm text-[#00d4b4] hover:underline"
+                  className="text-sm text-[#f5c842] hover:underline"
                 >
                   Giriş sayfasına dön
                 </button>
@@ -280,14 +279,14 @@ function LoginContent() {
                       placeholder="Kullanıcı Adı *"
                       value={regForm.username}
                       onChange={(e) => setRegForm(p => ({ ...p, username: e.target.value }))}
-                      className="w-full bg-transparent border-0 border-b border-gray-300 px-0 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#00d4b4] transition-colors"
+                      className="w-full bg-transparent border-0 border-b border-gray-300 px-0 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#f5c842] transition-colors"
                     />
                   </div>
                   <div>
                     <select
                       value={regForm.country}
                       onChange={(e) => setRegForm(p => ({ ...p, country: e.target.value }))}
-                      className="w-full bg-transparent border-0 border-b border-gray-300 px-0 py-2.5 text-sm text-gray-400 focus:outline-none focus:border-[#00d4b4] transition-colors appearance-none"
+                      className="w-full bg-transparent border-0 border-b border-gray-300 px-0 py-2.5 text-sm text-gray-400 focus:outline-none focus:border-[#f5c842] transition-colors appearance-none"
                     >
                       <option value="">Ülke</option>
                       <option value="TR">Türkiye</option>
@@ -307,14 +306,14 @@ function LoginContent() {
                       placeholder="Şifre *"
                       value={regForm.password}
                       onChange={(e) => setRegForm(p => ({ ...p, password: e.target.value }))}
-                      className="w-full bg-transparent border-0 border-b border-gray-300 px-0 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#00d4b4] transition-colors"
+                      className="w-full bg-transparent border-0 border-b border-gray-300 px-0 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#f5c842] transition-colors"
                     />
                   </div>
                   <div>
                     <select
                       value={regForm.currency}
                       onChange={(e) => setRegForm(p => ({ ...p, currency: e.target.value }))}
-                      className="w-full bg-transparent border-0 border-b border-gray-300 px-0 py-2.5 text-sm text-gray-400 focus:outline-none focus:border-[#00d4b4] transition-colors appearance-none"
+                      className="w-full bg-transparent border-0 border-b border-gray-300 px-0 py-2.5 text-sm text-gray-400 focus:outline-none focus:border-[#f5c842] transition-colors appearance-none"
                     >
                       <option value="">Para Birimi</option>
                       <option value="TRY">TRY — Türk Lirası</option>
@@ -333,7 +332,7 @@ function LoginContent() {
                       placeholder="Şifreyi Onayla *"
                       value={regForm.confirmPassword}
                       onChange={(e) => setRegForm(p => ({ ...p, confirmPassword: e.target.value }))}
-                      className="w-full bg-transparent border-0 border-b border-gray-300 px-0 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#00d4b4] transition-colors"
+                      className="w-full bg-transparent border-0 border-b border-gray-300 px-0 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#f5c842] transition-colors"
                     />
                   </div>
                   <div>
@@ -341,7 +340,7 @@ function LoginContent() {
                       placeholder="Ad Soyad"
                       value={regForm.name}
                       onChange={(e) => setRegForm(p => ({ ...p, name: e.target.value }))}
-                      className="w-full bg-transparent border-0 border-b border-gray-300 px-0 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#00d4b4] transition-colors"
+                      className="w-full bg-transparent border-0 border-b border-gray-300 px-0 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#f5c842] transition-colors"
                     />
                   </div>
                 </div>
@@ -351,7 +350,7 @@ function LoginContent() {
                     placeholder="Website URL *"
                     value={regForm.websiteUrl}
                     onChange={(e) => setRegForm(p => ({ ...p, websiteUrl: e.target.value }))}
-                    className="w-full bg-transparent border-0 border-b border-gray-300 px-0 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#00d4b4] transition-colors"
+                    className="w-full bg-transparent border-0 border-b border-gray-300 px-0 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#f5c842] transition-colors"
                   />
                 </div>
 
@@ -362,7 +361,7 @@ function LoginContent() {
                     placeholder="E-Mail *"
                     value={regForm.email}
                     onChange={(e) => setRegForm(p => ({ ...p, email: e.target.value }))}
-                    className="w-full bg-transparent border-0 border-b border-gray-300 px-0 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#00d4b4] transition-colors"
+                    className="w-full bg-transparent border-0 border-b border-gray-300 px-0 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#f5c842] transition-colors"
                   />
                 </div>
 
@@ -380,7 +379,7 @@ function LoginContent() {
                         placeholder="Telegram kullanıcı adı"
                         value={regForm.telegram}
                         onChange={(e) => setRegForm(p => ({ ...p, telegram: e.target.value }))}
-                        className="w-full bg-transparent border-0 border-b border-gray-300 pl-6 pr-0 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#00d4b4] transition-colors"
+                        className="w-full bg-transparent border-0 border-b border-gray-300 pl-6 pr-0 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#f5c842] transition-colors"
                       />
                     </div>
                     <div className="relative">
@@ -393,7 +392,7 @@ function LoginContent() {
                         placeholder="Teams / LinkedIn"
                         value={regForm.teams}
                         onChange={(e) => setRegForm(p => ({ ...p, teams: e.target.value }))}
-                        className="w-full bg-transparent border-0 border-b border-gray-300 pl-6 pr-0 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#00d4b4] transition-colors"
+                        className="w-full bg-transparent border-0 border-b border-gray-300 pl-6 pr-0 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#f5c842] transition-colors"
                       />
                     </div>
                   </div>
@@ -408,7 +407,7 @@ function LoginContent() {
                 <button
                   type="submit"
                   disabled={regLoading}
-                  className="mt-1 bg-[#00d4b4] hover:bg-[#00b89c] text-white font-bold rounded-full py-3 text-sm uppercase tracking-widest transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="mt-1 bg-[#f5c842] hover:bg-[#e8b82e] text-white font-bold rounded-full py-3 text-sm uppercase tracking-widest transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {regLoading ? (
                     <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
@@ -430,16 +429,9 @@ function LoginContent() {
             © 2026 AFFİLİATES. TÜM HAKLARI SAKLIDIR.
           </p>
           <div className="flex items-center gap-4">
-            <div className="w-8 h-8 rounded-full border-2 border-[#00d4b4] flex items-center justify-center">
-              <span className="text-[#00d4b4] text-xs font-bold">18+</span>
+            <div className="w-8 h-8 rounded-full border-2 border-[#f5c842] flex items-center justify-center">
+              <span className="text-[#f5c842] text-xs font-bold">18+</span>
             </div>
-            <Image
-              src="/powered_by.svg"
-              alt="Powered by EveryMatrix"
-              width={111}
-              height={49}
-              className="object-contain"
-            />
           </div>
         </div>
       </footer>

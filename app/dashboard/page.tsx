@@ -142,7 +142,7 @@ export default function DashboardPage() {
         setRole(r)
         if (typeof parsed.commissionRate === "number") setCommissionRate(parsed.commissionRate)
         if (parsed.commissionType) setCommissionType(parsed.commissionType)
-        if (code) setRefLink(`https://velobet280.com/register?a=${code}`)
+        if (code) setRefLink(`https://bizzocazino.com/register?a=${code}`)
         // If no refCode and not admin/superadmin, force re-login
         if (!code && r !== "admin" && r !== "superadmin") {
           localStorage.removeItem("affiliate_token")
@@ -164,11 +164,13 @@ export default function DashboardPage() {
   async function fetchData(id: string, t: string, code?: string, r?: string) {
     const isAdmin = (r || role) === "admin" || (r || role) === "superadmin"
     setLoading(true)
+    console.log("[v0] Dashboard fetchData called:", { id, code, r, isAdmin, hasToken: !!t })
     try {
-      if (!isAdmin && !id && !code) { setLoading(false); return }
+      if (!isAdmin && !id && !code) { console.log("[v0] Skipping fetch - no data"); setLoading(false); return }
 
       // Superadmin with no code: send id only, API will aggregate all partners
       const param = code ? `refCode=${encodeURIComponent(code)}` : `id=${id}`
+      console.log("[v0] Fetching with param:", param)
       const [infoRes, lastFiveRes, chartRes] = await Promise.all([
         fetch(`/api/affiliate/info?${param}`, { headers: { "x-auth-token": t } }),
         fetch(`/api/affiliate/last-five?${param}`, { headers: { "x-auth-token": t } }),
@@ -180,6 +182,9 @@ export default function DashboardPage() {
         lastFiveRes.json().catch(() => ({})),
         chartRes.json().catch(() => ({})),
       ])
+
+      console.log("[v0] API responses:", { info: infoRes.status, lastFive: lastFiveRes.status, chart: chartRes.status })
+      console.log("[v0] Info data:", infoData)
 
       if (infoData.success) {
         const s = infoData.stats || {}
@@ -193,7 +198,7 @@ export default function DashboardPage() {
         })
         if (s.commissionRate) setCommissionRate(s.commissionRate)
         setRefCode(code)
-        setRefLink(`https://velobet280.com/register?a=${code}`)
+        setRefLink(`https://bizzocazino.com/register?a=${code}`)
       }
 
       // API { success, data: [...] } döndürür
@@ -215,7 +220,7 @@ export default function DashboardPage() {
   }
 
   function copyRefLink() {
-    const link = refLink || `https://velobet280.com/register?a=${refCode || userId}`
+    const link = refLink || `https://bizzocazino.com/register?a=${refCode || userId}`
     navigator.clipboard.writeText(link)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
@@ -261,7 +266,7 @@ export default function DashboardPage() {
     )
   }
 
-  const displayLink = refLink || (refCode ? `https://velobet280.com/register?a=${refCode}` : "")
+  const displayLink = refLink || (refCode ? `https://bizzocazino.com/register?a=${refCode}` : "")
 
   return (
     <div className="flex flex-col gap-6 max-w-6xl mx-auto">
@@ -302,7 +307,7 @@ export default function DashboardPage() {
           <div className="flex-1">
             <p className="text-sm font-semibold text-foreground">Referans Linkiniz</p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              velobet280.com — Komisyon:{" "}
+              Bizzocazino — Komisyon:{" "}
               <span className="font-semibold text-primary">{commissionRate}%</span>{" "}
               ({commissionType === "net" ? "Net kazanç bazlı" : "Deposit bazlı"})
             </p>

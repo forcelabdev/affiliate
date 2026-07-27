@@ -1,6 +1,6 @@
 import mongoose from "mongoose"
 
-const MONGODB_URI = process.env.MONGODB_URI || ""
+const MONGODB_URI = process.env.MONGODB_URI || process.env.MONGODB_CONNECTION_STRING || ""
 
 declare global {
   // eslint-disable-next-line no-var
@@ -13,7 +13,7 @@ export async function connectDB(): Promise<typeof mongoose> {
   if (!global._dbPromise) {
     global._dbPromise = mongoose
       .connect(MONGODB_URI, {
-        dbName: "fonbet",
+        dbName: "bizzocazino",
         bufferCommands: false,
         serverSelectionTimeoutMS: 30000,
         connectTimeoutMS: 30000,

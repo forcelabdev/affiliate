@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/api-auth"
 import { neon } from "@neondatabase/serverless"
 import mongoose from "mongoose"
+import { connectDB } from "@/lib/connectDB"
 
 // ── POST: Superadmin manuel bilet ekle ──────────────────────────────────────
 export async function POST(req: NextRequest) {
@@ -52,21 +53,6 @@ export async function POST(req: NextRequest) {
     message: `${username} kullanıcısına ${ticketCount} adet bilet eklendi.`,
     note,
   })
-}
-
-async function connectDB() {
-  if (mongoose.connection.readyState === 1 && mongoose.connection.db) return
-  const uri = process.env.MONGODB_URI || process.env.MONGODB_CONNECTION_STRING
-  if (!uri) throw new Error("MONGODB_URI not set")
-  await mongoose.connect(uri, {
-    dbName: "fonbet",
-    bufferCommands: false,
-    serverSelectionTimeoutMS: 30000,
-    connectTimeoutMS: 30000,
-    family: 4,
-  })
-  if (!mongoose.connection.db)
-    await new Promise<void>((r) => mongoose.connection.once("connected", () => r()))
 }
 
 export async function GET(req: NextRequest) {
