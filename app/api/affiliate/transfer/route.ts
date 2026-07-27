@@ -5,7 +5,8 @@ import { verifyToken } from "@/lib/auth"
 import { checkRateLimit, isValidObjectId, sanitizeInt, safeParse } from "@/lib/security"
 
 async function connectDB() {
-  if (mongoose.connection.readyState === 1 && mongoose.connection.db) return
+  if (mongoose.connection.readyState === 1 && mongoose.connection.db && mongoose.connection.db.databaseName === "bizzocazino") return
+  if (mongoose.connection.readyState === 1 && mongoose.connection.db && mongoose.connection.db.databaseName !== "bizzocazino") await mongoose.disconnect()
   const uri = process.env.MONGODB_URI || process.env.MONGODB_CONNECTION_STRING
   if (!uri) throw new Error("MONGODB_URI not set")
   await mongoose.connect(uri, { dbName: "bizzocazino", bufferCommands: false, serverSelectionTimeoutMS: 30000 })
