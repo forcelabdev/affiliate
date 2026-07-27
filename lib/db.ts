@@ -13,7 +13,7 @@ export async function connectDB(): Promise<typeof mongoose> {
   if (!global._dbPromise) {
     global._dbPromise = mongoose
       .connect(MONGODB_URI, {
-        dbName: "bizzocasino",
+        dbName: "bizzocazino",
         bufferCommands: false,
         serverSelectionTimeoutMS: 30000,
         connectTimeoutMS: 30000,
