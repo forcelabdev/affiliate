@@ -164,11 +164,13 @@ export default function DashboardPage() {
   async function fetchData(id: string, t: string, code?: string, r?: string) {
     const isAdmin = (r || role) === "admin" || (r || role) === "superadmin"
     setLoading(true)
+    console.log("[v0] Dashboard fetchData called:", { id, code, r, isAdmin, hasToken: !!t })
     try {
-      if (!isAdmin && !id && !code) { setLoading(false); return }
+      if (!isAdmin && !id && !code) { console.log("[v0] Skipping fetch - no data"); setLoading(false); return }
 
       // Superadmin with no code: send id only, API will aggregate all partners
       const param = code ? `refCode=${encodeURIComponent(code)}` : `id=${id}`
+      console.log("[v0] Fetching with param:", param)
       const [infoRes, lastFiveRes, chartRes] = await Promise.all([
         fetch(`/api/affiliate/info?${param}`, { headers: { "x-auth-token": t } }),
         fetch(`/api/affiliate/last-five?${param}`, { headers: { "x-auth-token": t } }),
@@ -180,6 +182,9 @@ export default function DashboardPage() {
         lastFiveRes.json().catch(() => ({})),
         chartRes.json().catch(() => ({})),
       ])
+
+      console.log("[v0] API responses:", { info: infoRes.status, lastFive: lastFiveRes.status, chart: chartRes.status })
+      console.log("[v0] Info data:", infoData)
 
       if (infoData.success) {
         const s = infoData.stats || {}
