@@ -129,7 +129,6 @@ export default function BalanceAnalysisPage() {
   const [customEnd, setCustomEnd]     = useState("")
   const [search, setSearch]           = useState("")
   const [searchInput, setSearchInput] = useState("")
-  const [hideAdmins, setHideAdmins]   = useState(false)
   const searchTimeout                  = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Data
@@ -234,19 +233,6 @@ export default function BalanceAnalysisPage() {
         ))}
       </div>
 
-      {/* Admin filter */}
-      <div className="flex items-center gap-3">
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={hideAdmins}
-            onChange={e => setHideAdmins(e.target.checked)}
-            className="w-4 h-4 rounded border border-border bg-background text-primary focus:ring-2 focus:ring-primary/40 cursor-pointer"
-          />
-          <span className="text-sm text-muted-foreground font-medium">Admin üyeleri gizle</span>
-        </label>
-      </div>
-
       {/* Custom date */}
       {period === "custom" && (
         <div className="flex items-center gap-3 flex-wrap">
@@ -332,7 +318,7 @@ export default function BalanceAnalysisPage() {
                 </tr>
               </thead>
               <tbody>
-                {users.filter(u => !hideAdmins || !u.partnerName?.toLowerCase().includes('admin')).map((u, i) => {
+                {users.map((u, i) => {
                   const isOpen = expandedUsers[u.userId]
                   const tab    = getTab(u.userId)
                   return (
