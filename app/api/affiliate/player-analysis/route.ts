@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
   // ── DETAIL MODE: return all individual transactions for one player ──────
   if (detail === "1" && usernameFilter) {
     const user = await usersCol.findOne(
-      { username: { $regex: `^${usernameFilter.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, $options: "i" } },
+      { username: { $regex: `^${usernameFilter.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, $options: "i" }, role: { $ne: "admin" } },
       { projection: { _id: 1, username: 1, name: 1, wallets: 1 } }
     )
     if (!user) {
@@ -193,7 +193,7 @@ export async function GET(req: NextRequest) {
   }
 
   // ── LIST MODE: players with transaction summaries ────────────────────────
-  const userQuery: Record<string, unknown> = {}
+  const userQuery: Record<string, unknown> = { role: { $ne: "admin" } }
   if (usernameFilter) {
     userQuery.username = { $regex: usernameFilter.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), $options: "i" }
   }
