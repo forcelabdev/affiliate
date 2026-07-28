@@ -99,11 +99,12 @@ export async function GET(req: NextRequest) {
 
     const financeTx  = mongoose.connection.db!.collection("forcelabfinancetransactions")
     const meeldevTx  = mongoose.connection.db!.collection("meeldevtransactions")
+    const fluxTx     = mongoose.connection.db!.collection("fluxkriptotransactions")
+    const xpayTx     = mongoose.connection.db!.collection("xpaymenttransactions")
     const dateRange: Record<string, unknown> = {}
     if (startDate) dateRange.$gte = startDate
     if (endDate)   dateRange.$lte = endDate
 
-    // --- Ortak status listesi ---
     const approvedStatuses = ["approved", "completed", "success", "confirmed"]
 
     // --- forcelabfinancetransactions ---
@@ -122,6 +123,7 @@ export async function GET(req: NextRequest) {
       status: { $in: approvedStatuses },
     }
     if (startDate || endDate) withdrawalQuery.createdAt = dateRange
+
     // --- meeldevtransactions ---
     const meelDepositQuery: Record<string, unknown> = {
       user: { $in: userIds },
@@ -139,33 +141,66 @@ export async function GET(req: NextRequest) {
     }
     if (startDate || endDate) meelWithdrawQuery.createdAt = dateRange
 
+    // --- fluxkriptotransactions (type: "deposit", status: "approved") ---
+    const fluxDepositQuery: Record<string, unknown> = {
+      user: { $in: userIds },
+      type: "deposit",
+      status: { $in: approvedStatuses },
+    }
+    if (startDate || endDate) fluxDepositQuery.createdAt = dateRange
+
+    const fluxWithdrawQuery: Record<string, unknown> = {
+      user: { $in: userIds },
+      type: { $in: ["withdraw", "withdrawal"] },
+      status: { $in: approvedStatuses },
+    }
+    if (startDate || endDate) fluxWithdrawQuery.createdAt = dateRange
+
+    // --- xpaymenttransactions (type: "deposit", status: "approved") ---
+    const xpayDepositQuery: Record<string, unknown> = {
+      user: { $in: userIds },
+      type: "deposit",
+      status: { $in: approvedStatuses },
+    }
+    if (startDate || endDate) xpayDepositQuery.createdAt = dateRange
+
+    const xpayWithdrawQuery: Record<string, unknown> = {
+      user: { $in: userIds },
+      type: { $in: ["withdraw", "withdrawal"] },
+      status: { $in: approvedStatuses },
+    }
+    if (startDate || endDate) xpayWithdrawQuery.createdAt = dateRange
+
     // Tüm koleksiyonları paralel çek
-    const [transfers, withdrawals, meelDeposits, meelWithdraws] = await Promise.all([
+    const [transfers, withdrawals, meelDeposits, meelWithdraws, fluxDeposits, fluxWithdraws, xpayDeposits, xpayWithdraws] = await Promise.all([
       financeTx.find(depositQuery,      { projection: { user: 1, amount: 1, status: 1, createdAt: 1, providerName: 1 } }).toArray(),
       financeTx.find(withdrawalQuery,   { projection: { user: 1, amount: 1, createdAt: 1 } }).toArray(),
       meeldevTx.find(meelDepositQuery,  { projection: { user: 1, amount: 1, status: 1, createdAt: 1, providerName: 1 } }).toArray(),
-      meeldevTx.find(meelWithdrawQuery, { projection: { user: 1, amount: 1, status: 1, createdAt: 1 } }).toArray(),
+      meeldevTx.find(meelWithdrawQuery, { projection: { user: 1, amount: 1, createdAt: 1 } }).toArray(),
+      fluxTx.find(fluxDepositQuery,     { projection: { user: 1, amount: 1, status: 1, createdAt: 1, currency: 1 } }).toArray(),
+      fluxTx.find(fluxWithdrawQuery,    { projection: { user: 1, amount: 1, createdAt: 1 } }).toArray(),
+      xpayTx.find(xpayDepositQuery,     { projection: { user: 1, amount: 1, status: 1, createdAt: 1, "account.bankName": 1 } }).toArray(),
+      xpayTx.find(xpayWithdrawQuery,    { projection: { user: 1, amount: 1, createdAt: 1 } }).toArray(),
     ])
 
-    // Group by userId — her iki kaynaktan gelen tutarları topla
+    // Group by userId — tüm kaynaklardan gelen tutarları topla
     const depositByUser: Record<string, number> = {}
     const withdrawalByUser: Record<string, number> = {}
-    // Bireysel tx listesi (tarih düzenleme için)
-    const txByUser: Record<string, { txId: string; source: "forcelab"|"meeldev"; amount: number; status: string; createdAt: string; method?: string }[]> = {}
+    const txByUser: Record<string, { txId: string; source: string; amount: number; status: string; createdAt: string; method?: string }[]> = {}
 
-    for (const t of transfers) {
+    const addDeposit = (t: any, source: string, method?: string) => {
       const uid = String(t.user)
       depositByUser[uid] = (depositByUser[uid] ?? 0) + (t.amount ?? 0)
       if (!txByUser[uid]) txByUser[uid] = []
-      txByUser[uid].push({ txId: String(t._id), source: "forcelab", amount: t.amount ?? 0, status: t.status ?? "approved", createdAt: t.createdAt?.toISOString?.() ?? String(t.createdAt ?? ""), method: t.providerName })
+      txByUser[uid].push({ txId: String(t._id), source, amount: t.amount ?? 0, status: t.status ?? "approved", createdAt: t.createdAt?.toISOString?.() ?? String(t.createdAt ?? ""), method })
     }
-    for (const t of meelDeposits) {
-      const uid = String(t.user)
-      depositByUser[uid] = (depositByUser[uid] ?? 0) + (t.amount ?? 0)
-      if (!txByUser[uid]) txByUser[uid] = []
-      txByUser[uid].push({ txId: String(t._id), source: "meeldev", amount: t.amount ?? 0, status: t.status ?? "approved", createdAt: t.createdAt?.toISOString?.() ?? String(t.createdAt ?? ""), method: t.providerName })
-    }
-    for (const t of [...withdrawals, ...meelWithdraws]) {
+
+    for (const t of transfers)   addDeposit(t, "forcelab",   t.providerName)
+    for (const t of meelDeposits) addDeposit(t, "meeldev",   t.providerName)
+    for (const t of fluxDeposits) addDeposit(t, "fluxkripto", t.currency ?? "USDT")
+    for (const t of xpayDeposits) addDeposit(t, "xpayment",  t.account?.bankName)
+
+    for (const t of [...withdrawals, ...meelWithdraws, ...fluxWithdraws, ...xpayWithdraws]) {
       const uid = String(t.user)
       withdrawalByUser[uid] = (withdrawalByUser[uid] ?? 0) + (t.amount ?? 0)
     }
