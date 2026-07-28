@@ -85,7 +85,7 @@ export async function GET(req: NextRequest) {
 
     const userDocs = await db.collection("users")
       .find(
-        { _id: { $in: objectIds }, role: { $ne: "admin" } },
+        { _id: { $in: objectIds } },
         { projection: { _id: 1, username: 1, name: 1, "affiliates.redeemedCode": 1, "affiliates.code": 1 } }
       )
       .toArray()
