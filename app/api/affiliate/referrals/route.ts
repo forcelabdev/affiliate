@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
     ? requestedCode || session.refCode || null
     : session.refCode || requestedCode || null
 
-  console.log("[v0] referrals GET — user:", session.username, "role:", session.role, "session.refCode:", session.refCode, "requestedCode:", requestedCode, "id param:", searchParams.get("id"), "refCode resolved so far:", refCode)
+
 
   // If still no refCode and we have an id param, look it up from Neon immediately
   if (!isAdminAll && !refCode) {
@@ -65,7 +65,6 @@ export async function GET(req: NextRequest) {
         const sqlLookup = neon(dbUrl)
         const rows = await sqlLookup`SELECT ref_code FROM affiliate_users WHERE id = ${parseInt(affiliateId, 10)} LIMIT 1`
         const rc = rows?.[0]?.ref_code
-        console.log("[v0] referrals Neon lookup — id:", affiliateId, "rc:", rc)
         if (rc && rc !== "NULL" && rc !== "null") {
           refCode = rc as string
         }
@@ -75,7 +74,7 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  console.log("[v0] referrals final refCode:", refCode, "isAdminAll:", isAdminAll)
+
 
   try {
     await connectDB()
@@ -83,38 +82,65 @@ export async function GET(req: NextRequest) {
 
     // ---- ADMIN ALL MODE: tüm partnerlerin referrallarını getir ----
     if (isAdminAll) {
-      // Neon'dan tüm partnerleri çek
-      let allPartners: { username: string; ref_code: string }[] = []
+      // MongoDB'den tüm partnerleri çek (affiliates.code alanı olanlar)
+      const mongoPartners = await users.find(
+        { "affiliates.code": { $exists: true, $ne: null }, role: { $ne: "admin" } },
+        { projection: { _id: 1, username: 1, "affiliates.code": 1 } }
+      ).toArray()
+
+      // Neon'dan da partnerleri çek ve birleştir
+      let neonPartners: { username: string; ref_code: string }[] = []
       const databaseUrl = process.env.DATABASE_URL
       if (databaseUrl) {
         try {
           const { neon } = await import("@neondatabase/serverless")
           const sql = neon(databaseUrl)
           const rows = await sql`SELECT username, ref_code FROM affiliate_users WHERE ref_code IS NOT NULL`
-          allPartners = rows as { username: string; ref_code: string }[]
+          neonPartners = rows as { username: string; ref_code: string }[]
         } catch (e) {
           console.warn("[referrals] Neon error:", e)
         }
       }
 
-      // MongoDB'deki partner ObjectId'lerini bul
-      const partnerCodes = allPartners.map((p) => p.ref_code)
-      const partnerUsernames = allPartners.map((p) => p.username)
-      const mongoPartners = await users.find(
-        { "affiliates.code": { $in: partnerCodes } },
-        { projection: { _id: 1, "affiliates.code": 1 } }
-      ).toArray()
-
       const partnerIdToCode: Record<string, string> = {}
+      const allPartnerCodes: string[] = []
+      const allPartnerUsernames: string[] = []
+      const allPartnerIds: any[] = []
+
       for (const p of mongoPartners) {
         partnerIdToCode[String(p._id)] = p.affiliates?.code
+        allPartnerCodes.push(p.affiliates?.code)
+        allPartnerUsernames.push(p.username)
+        allPartnerIds.push(p._id)
+      }
+      for (const p of neonPartners) {
+        if (!allPartnerCodes.includes(p.ref_code)) allPartnerCodes.push(p.ref_code)
+        if (!allPartnerUsernames.includes(p.username)) allPartnerUsernames.push(p.username)
       }
 
       // Tüm referral koşulları
       const allOrConditions: Record<string, unknown>[] = [
-        { "affiliates.redeemedCode": { $in: partnerCodes } },
-        { "affiliates.referrerUsername": { $in: [...partnerCodes, ...partnerUsernames] } },
-        { "affiliates.referrer": { $in: mongoPartners.map((p: any) => p._id) } },
+        { "affiliates.redeemedCode": { $in: allPartnerCodes } },
+        { "affiliates.referrerUsername": { $in: [...allPartnerCodes, ...allPartnerUsernames] } },
+        { "affiliates.referrer": { $in: allPartnerIds } },
+      ]
+
+      // Neon'daki partnerların MongoDB karşılıklarını da ekle
+      const neonMongoPartners = await users.find(
+        { username: { $in: neonPartners.map(p => p.username) } },
+        { projection: { _id: 1, username: 1, "affiliates.code": 1 } }
+      ).toArray()
+      for (const p of neonMongoPartners) {
+        if (!allPartnerIds.some((id: any) => String(id) === String(p._id))) {
+          allOrConditions.push({ "affiliates.referrer": p._id })
+          partnerIdToCode[String(p._id)] = p.affiliates?.code
+        }
+      }
+
+      // allPartners için Neon username → code eşlemesi
+      const allPartners = [
+        ...mongoPartners.map(p => ({ username: p.username, ref_code: p.affiliates?.code })),
+        ...neonPartners,
       ]
 
       const docs = await users.find(
@@ -194,7 +220,7 @@ export async function GET(req: NextRequest) {
     const resolvedRefCode = refCode
     if (!resolvedRefCode) return NextResponse.json({ success: true, refCode: null, referrals: [] })
 
-    // Get partner username from Neon (to match transferred users)
+    // Neon'dan partner username'i çek
     let partnerUsername: string | null = null
     const databaseUrl = process.env.DATABASE_URL
     if (databaseUrl) {
@@ -210,17 +236,31 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const partner = await users.findOne({ "affiliates.code": resolvedRefCode }, { projection: { _id: 1 } })
+    // MongoDB'de partner'ı hem ref_code hem username ile ara
+    const partnerQuery: Record<string, unknown>[] = [{ "affiliates.code": resolvedRefCode }]
+    if (partnerUsername) partnerQuery.push({ username: partnerUsername })
+    const partner = await users.findOne({ $or: partnerQuery }, { projection: { _id: 1, username: 1, "affiliates.code": 1 } })
+
+    // Partner MongoDB'de bulunamazsa session username ile ara
+    const sessionPartner = !partner && session.username
+      ? await users.findOne({ username: session.username }, { projection: { _id: 1, username: 1, "affiliates.code": 1 } })
+      : null
+
+    const effectivePartner = partner || sessionPartner
 
     const orConditions: Record<string, unknown>[] = [
       { "affiliates.redeemedCode": resolvedRefCode },
       { "affiliates.referrerUsername": resolvedRefCode },
     ]
-    if (partner) {
-      orConditions.push({ "affiliates.referrer": partner._id })
+    if (effectivePartner) {
+      orConditions.push({ "affiliates.referrer": effectivePartner._id })
     }
     if (partnerUsername) {
       orConditions.push({ "affiliates.referrerUsername": partnerUsername })
+    }
+    if (effectivePartner?.affiliates?.code) {
+      orConditions.push({ "affiliates.redeemedCode": effectivePartner.affiliates.code })
+      orConditions.push({ "affiliates.referrerUsername": effectivePartner.username })
     }
 
     const query: Record<string, unknown> = { $or: orConditions }
