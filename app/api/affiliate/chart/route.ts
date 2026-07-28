@@ -20,7 +20,6 @@ export async function GET(req: NextRequest) {
 
   try {
     await connectDB()
-    console.log("[v0] Chart API - Connected to:", mongoose.connection.db?.databaseName)
     const usersCol = mongoose.connection.db!.collection("users")
     const databaseUrl = process.env.DATABASE_URL
 
