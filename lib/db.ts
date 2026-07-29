@@ -9,7 +9,7 @@ declare global {
 
 export async function connectDB(): Promise<typeof mongoose> {
   if (!MONGODB_URI) throw new Error("MONGODB_URI is not set")
-  if (mongoose.connection.readyState === 1) return mongoose
+  if (mongoose.connection.readyState === 1 && mongoose.connection.db?.databaseName === "bizzocazino") return mongoose
   if (!global._dbPromise) {
     global._dbPromise = mongoose
       .connect(MONGODB_URI, {

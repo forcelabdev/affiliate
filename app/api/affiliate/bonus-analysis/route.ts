@@ -6,7 +6,7 @@ import { neon } from "@neondatabase/serverless"
 
 export async function GET(req: NextRequest) {
   try {
-  if (!process.env.MONGODB_URI || process.env.MONGODB_CONNECTION_STRING) {
+  if (!process.env.MONGODB_URI && !process.env.MONGODB_CONNECTION_STRING) {
     return NextResponse.json({ success: false, message: "Sunucu yapılandırma hatası: MONGODB_URI tanımlı değil." }, { status: 500 })
   }
 
