@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
-import Image from "next/image"
 
 function useDarkMode() {
   const [dark, setDark] = useState(false)
@@ -256,15 +255,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       >
         {/* Brand */}
         <div className="flex items-center justify-center px-5 py-5 border-b border-sidebar-border">
-          <Image
-            src="/powered_by.svg"
-            alt="Logo"
-            width={140}
-            height={62}
-            className="object-contain"
-            style={{ width: "140px", height: "auto" }}
-            priority
-          />
+          <span className="text-lg font-bold tracking-wide text-foreground">Bizzocasino Partners</span>
         </div>
 
         {/* User Badge */}
