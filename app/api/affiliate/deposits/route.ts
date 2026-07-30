@@ -13,9 +13,8 @@ export async function GET(req: NextRequest) {
   const requestedCode = searchParams.get("refCode")
   const startDateParam = searchParams.get("startDate")
   const endDateParam   = searchParams.get("endDate")
-  // Only superadmin sees ALL deposits when no refCode is given.
-  // admin role must supply a refCode (behaves like a partner).
-  const isSuperAdmin = session.role === "superadmin"
+  // superadmin (and admin) can see ALL deposits when no refCode is given.
+  const isSuperAdmin = session.role === "superadmin" || session.role === "admin"
   const isAdmin = isSuperAdmin
   let refCode: string | null | undefined = isSuperAdmin
     ? requestedCode || session.refCode

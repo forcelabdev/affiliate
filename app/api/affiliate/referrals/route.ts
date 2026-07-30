@@ -70,8 +70,8 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const rawCode      = searchParams.get("refCode") || searchParams.get("code")
   const requestedCode = sanitize(rawCode)
-  // Only superadmin can view all referrals with no refCode filter.
-  const isSuperAdmin = session.role === "superadmin"
+  // superadmin and admin can view all referrals with no refCode filter.
+  const isSuperAdmin = session.role === "superadmin" || session.role === "admin"
   const isAdminAll   = isSuperAdmin && !requestedCode
 
   // Resolve refCode: session > URL param > Neon lookup by id

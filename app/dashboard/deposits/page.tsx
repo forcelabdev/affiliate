@@ -134,8 +134,11 @@ export default function DepositsPage() {
     setLoading(true)
     try {
       const params = new URLSearchParams()
-      if (code) params.append("refCode", code)
-      else params.append("id", id)
+      // Superadmin sends no id/code — API uses session role to return all deposits
+      if (!isAdmin) {
+        if (code) params.append("refCode", code)
+        else if (id) params.append("id", id)
+      }
 
       if (p === "custom" && cStart) {
         // TR saati UTC+3: "2026-04-21" → "2026-04-21T00:00:00+03:00" olarak parse et
@@ -384,7 +387,7 @@ export default function DepositsPage() {
       {period === "custom" && (
         <div className="flex flex-wrap items-center gap-3 bg-secondary/50 border border-border rounded-xl p-3">
           <div className="flex items-center gap-2">
-            <label className="text-xs text-muted-foreground font-medium whitespace-nowrap">Başlangıç:</label>
+            <label className="text-xs text-muted-foreground font-medium whitespace-nowrap">Ba��langıç:</label>
             <input
               type="date"
               value={customStart}

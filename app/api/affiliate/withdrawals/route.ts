@@ -13,8 +13,8 @@ export async function GET(req: NextRequest) {
   const requestedCode = searchParams.get("refCode")
   const startDateParam = searchParams.get("startDate")
 
-  // Only superadmin can see all withdrawals with no refCode filter.
-  const isAdminAll = session.role === "superadmin" && !requestedCode
+  // superadmin and admin can see all withdrawals with no refCode filter.
+  const isAdminAll = (session.role === "superadmin" || session.role === "admin") && !requestedCode
   const refCode = isAdminAll
     ? null
     : session.refCode || requestedCode || null
