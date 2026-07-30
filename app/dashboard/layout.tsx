@@ -265,7 +265,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       >
         {/* Brand */}
         <div className="flex items-center justify-center px-5 py-5 border-b border-sidebar-border">
-          <span className="text-lg font-bold tracking-wide text-foreground">Bizzocasino Partners</span>
+          <div className="text-center select-none">
+            <h1 className="text-2xl font-black tracking-wider uppercase text-foreground">
+              BIZZO <span style={{ color: "#f5c842" }}>CASINO</span>
+            </h1>
+            <p className="text-[10px] text-muted-foreground tracking-[0.3em] uppercase mt-0.5">Partners</p>
+          </div>
         </div>
 
         {/* User Badge */}
