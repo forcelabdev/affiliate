@@ -129,7 +129,7 @@ export default function DepositsPage() {
     id: string, t: string, code?: string, p: Period = "all", r?: string,
     cStart?: string, cEnd?: string
   ) => {
-    const isAdmin = (r || role) === "admin" || (r || role) === "superadmin"
+    const isAdmin = (r || role) === "superadmin"
     if (!isAdmin && !id && !code) { setLoading(false); return }
     setLoading(true)
     try {

@@ -13,11 +13,16 @@ export async function GET(req: NextRequest) {
   const requestedCode = searchParams.get("refCode")
   const startDateParam = searchParams.get("startDate")
   const endDateParam   = searchParams.get("endDate")
-  const isAdmin = session.role === "admin" || session.role === "superadmin"
-  let refCode: string | null | undefined = isAdmin ? requestedCode || session.refCode : session.refCode || requestedCode
+  // Only superadmin sees ALL deposits when no refCode is given.
+  // admin role must supply a refCode (behaves like a partner).
+  const isSuperAdmin = session.role === "superadmin"
+  const isAdmin = isSuperAdmin
+  let refCode: string | null | undefined = isSuperAdmin
+    ? requestedCode || session.refCode
+    : session.refCode || requestedCode
 
   // If no refCode, try to resolve from ?id= param via Neon
-  if (!refCode && !isAdmin) {
+  if (!refCode && !isSuperAdmin) {
     const affiliateId = searchParams.get("id")
     const dbUrl = process.env.DATABASE_URL
     if (affiliateId && dbUrl) {

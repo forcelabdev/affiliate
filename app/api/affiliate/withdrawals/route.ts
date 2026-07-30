@@ -13,12 +13,11 @@ export async function GET(req: NextRequest) {
   const requestedCode = searchParams.get("refCode")
   const startDateParam = searchParams.get("startDate")
 
-  const isAdminAll = (session.role === "superadmin" || session.role === "admin") && !requestedCode
+  // Only superadmin can see all withdrawals with no refCode filter.
+  const isAdminAll = session.role === "superadmin" && !requestedCode
   const refCode = isAdminAll
     ? null
-    : (session.role === "superadmin" || session.role === "admin")
-      ? requestedCode || session.refCode
-      : session.refCode
+    : session.refCode || requestedCode || null
 
   if (!isAdminAll && !refCode) {
     return NextResponse.json({ success: false, message: "Ref kodu bulunamadı." }, { status: 400 })
