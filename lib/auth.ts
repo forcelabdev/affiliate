@@ -36,43 +36,86 @@ export function getCommissionOverride(username: string) {
 }
 
 /**
- * Get affiliate users from Neon PostgreSQL database.
- * Reads from affiliate_users table.
+ * Get affiliate users from both Neon PostgreSQL and MongoDB affiliate_users collection.
+ * Neon is primary; MongoDB affiliate_users is merged in as a fallback/supplement.
+ * This ensures partners defined only in MongoDB (with refCode: "sena", "nil", etc.)
+ * can still log in even when their Neon record is missing or out of sync.
  */
 export async function getAffiliateUsersFromDB(): Promise<AffiliateUser[]> {
+  const neonUsers: AffiliateUser[] = []
+  const mongoUsers: AffiliateUser[] = []
+
+  // 1. Try Neon
   try {
     const databaseUrl = process.env.DATABASE_URL
-    if (!databaseUrl) {
-      console.warn("[v0] DATABASE_URL not set, using fallback")
-      return getAffiliateUsers()
-    }
-
-    const sql = neon(databaseUrl)
-    const users = await sql`SELECT * FROM affiliate_users`
-
-    if (!users || !Array.isArray(users) || users.length === 0) {
-      console.warn("[v0] No users in Neon, using fallback")
-      return getAffiliateUsers()
-    }
-
-    return users.map((doc: any) => {
-      const rawRef = doc.ref_code
-      const refCode = rawRef && rawRef !== "NULL" && rawRef !== "null" ? rawRef : undefined
-      return {
-        username: doc.username || "",
-        password: doc.password || "",
-        affiliateId: doc.id?.toString() || doc.id,
-        refCode,
-        name: doc.name,
-        role: doc.role || "partner",
-        commissionRate: doc.commission_rate,
-        commissionType: doc.commission_type,
+    if (databaseUrl) {
+      const sql = neon(databaseUrl)
+      const rows = await sql`SELECT * FROM affiliate_users`
+      if (Array.isArray(rows) && rows.length > 0) {
+        for (const doc of rows) {
+          const rawRef = doc.ref_code
+          const refCode = rawRef && rawRef !== "NULL" && rawRef !== "null" ? String(rawRef) : undefined
+          neonUsers.push({
+            username: doc.username || "",
+            password: doc.password || "",
+            affiliateId: doc.id?.toString(),
+            refCode,
+            name: doc.name,
+            role: doc.role || "partner",
+            commissionRate: doc.commission_rate,
+            commissionType: doc.commission_type,
+          })
+        }
       }
-    })
+    }
   } catch (err) {
-    console.warn("[v0] Neon fetch failed, using fallback:", err instanceof Error ? err.message : err)
+    console.warn("[auth] Neon fetch failed:", err instanceof Error ? err.message : err)
+  }
+
+  // 2. Try MongoDB affiliate_users collection as supplement
+  try {
+    const mongoUri = process.env.MONGODB_CONNECTION_STRING
+    if (mongoUri) {
+      // Lazy import to avoid circular deps
+      const mongoose = await import("mongoose")
+      if (mongoose.default.connection.readyState === 0) {
+        await mongoose.default.connect(mongoUri, { dbName: "bizzocazino", serverSelectionTimeoutMS: 8000 })
+      }
+      const db = mongoose.default.connection.db
+      if (db) {
+        const docs = await db.collection("affiliate_users").find({}).toArray()
+        const neonUsernames = new Set(neonUsers.map((u) => u.username.toLowerCase()))
+        for (const doc of docs) {
+          const uname = doc.username || ""
+          // Skip if already loaded from Neon (Neon takes precedence)
+          if (neonUsernames.has(uname.toLowerCase())) continue
+          const rawRef = doc.refCode || doc.ref_code
+          const refCode = rawRef && rawRef !== "NULL" && rawRef !== "null" ? String(rawRef) : undefined
+          mongoUsers.push({
+            username: uname,
+            password: doc.password || "",
+            affiliateId: String(doc._id),
+            refCode,
+            name: doc.name,
+            role: doc.role || "partner",
+            commissionRate: doc.commissionRate ?? doc.commission_rate,
+            commissionType: doc.commissionType ?? doc.commission_type,
+          })
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("[auth] MongoDB affiliate_users fetch failed:", err instanceof Error ? err.message : err)
+  }
+
+  const combined = [...neonUsers, ...mongoUsers]
+
+  if (combined.length === 0) {
+    console.warn("[auth] No users from Neon or MongoDB, using env fallback")
     return getAffiliateUsers()
   }
+
+  return combined
 }
 
 /** Load partner list from AFFILIATE_USERS env variable (or DB if available).

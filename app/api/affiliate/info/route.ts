@@ -25,35 +25,39 @@ export async function GET(req: NextRequest) {
     let commissionRateOverride: number | null = null
 
     if (isAdminAll) {
-      // Superadmin no refCode: aggregate ALL partners
-      let allCodes: string[] = []
-      let allUsernames: string[] = []
-      if (databaseUrl) {
-        try {
-          const { neon } = await import("@neondatabase/serverless")
-          const sql = neon(databaseUrl)
-          const rows = await sql`SELECT username, ref_code FROM affiliate_users WHERE ref_code IS NOT NULL`
-          allCodes = rows.map((r: any) => r.ref_code)
-          allUsernames = rows.map((r: any) => r.username)
-        } catch (e) { console.warn("[affiliate/info] Neon error:", e) }
-      }
-      const mongoPartners = await usersCol.find(
-        { "affiliates.code": { $in: allCodes } },
-        { projection: { _id: 1 } }
-      ).toArray()
+      // Superadmin no refCode: aggregate ALL referral users directly from MongoDB
+      // Use MongoDB's own distinct redeemedCode values — do NOT filter by Neon ref_codes
+      // because Neon ref_codes (REF001, testreff…) may not match MongoDB's actual values.
+      const allRedeemedCodes: string[] = (
+        await usersCol.distinct("affiliates.redeemedCode")
+      ).filter((c: any) => c && typeof c === "string")
+
+      const allPartnerIds: any[] = (
+        await usersCol.distinct("affiliates.referrer")
+      ).filter(Boolean)
+
+      const allReferrerUsernames: string[] = (
+        await usersCol.distinct("affiliates.referrerUsername")
+      ).filter((v: any) => v && typeof v === "string")
+
       orConditions = [
-        { "affiliates.redeemedCode": { $in: allCodes } },
-        { "affiliates.referrerUsername": { $in: [...allCodes, ...allUsernames] } },
-        { "affiliates.referrer": { $in: mongoPartners.map((p: any) => p._id) } },
+        { "affiliates.redeemedCode": { $exists: true, $ne: null } },
       ]
+      if (allPartnerIds.length > 0) {
+        orConditions.push({ "affiliates.referrer": { $in: allPartnerIds } })
+      }
+      if (allReferrerUsernames.length > 0) {
+        orConditions.push({ "affiliates.referrerUsername": { $in: allReferrerUsernames } })
+      }
     } else {
       // Single partner mode
+      // 1) Try Neon for commission rate
       let partnerUsername: string | null = null
       if (databaseUrl) {
         try {
           const { neon } = await import("@neondatabase/serverless")
           const sql = neon(databaseUrl)
-          const partners = await sql`SELECT username, commission_rate FROM affiliate_users WHERE ref_code = ${refCode}`
+          const partners = await sql`SELECT username, commission_rate FROM affiliate_users WHERE ref_code = ${refCode} OR username = ${session.username}`
           if (partners && partners.length > 0) {
             partnerUsername = partners[0].username
             commissionRateOverride = partners[0].commission_rate ?? null
@@ -61,17 +65,25 @@ export async function GET(req: NextRequest) {
         } catch (e) { console.warn("[affiliate/info] Neon error:", e) }
       }
 
+      // 2) Find partner in MongoDB by affiliates.code OR by username
       const partner = await usersCol.findOne(
-        { "affiliates.code": refCode },
+        { $or: [{ "affiliates.code": refCode }, { username: session.username }] },
         { projection: { _id: 1, username: 1, name: 1, affiliates: 1 } }
       )
 
+      // 3) Build broad match — include the partner's own affiliates.code too
+      const partnerMongoCode = partner?.affiliates?.code
       orConditions = [
         { "affiliates.redeemedCode": refCode },
         { "affiliates.referrerUsername": refCode },
       ]
       if (partner) orConditions.push({ "affiliates.referrer": partner._id })
-      if (partnerUsername) orConditions.push({ "affiliates.referrerUsername": partnerUsername })
+      if (partnerUsername && partnerUsername !== refCode) {
+        orConditions.push({ "affiliates.referrerUsername": partnerUsername })
+      }
+      if (partnerMongoCode && partnerMongoCode !== refCode) {
+        orConditions.push({ "affiliates.redeemedCode": partnerMongoCode })
+      }
     }
 
     const referralUsers = await usersCol.find(
@@ -90,14 +102,16 @@ export async function GET(req: NextRequest) {
     const monthEnd = new Date(trNow.getFullYear(), trNow.getMonth() + 1, 1)
     monthEnd.setMilliseconds(-1)
 
-    // Total approved deposits this month from both forcelab and meeldev (bonus hariç)
+    // Total approved deposits this month from all payment collections (bonus hariç)
     const financeTx = mongoose.connection.db!.collection("forcelabfinancetransactions")
     const meeldevTx = mongoose.connection.db!.collection("meeldevtransactions")
+    const fluxTx    = mongoose.connection.db!.collection("fluxkriptotransactions")
+    const xpayTx    = mongoose.connection.db!.collection("xpaymenttransactions")
     const approvedStatuses = ["approved", "completed", "success", "confirmed"]
 
     let totalDeposits = 0
     if (userIds.length > 0) {
-      const [forcelabAgg, meeldevAgg] = await Promise.all([
+      const [forcelabAgg, meeldevAgg, fluxAgg, xpayAgg] = await Promise.all([
         financeTx.aggregate([
           {
             $match: {
@@ -124,8 +138,31 @@ export async function GET(req: NextRequest) {
           },
           { $group: { _id: null, total: { $sum: "$amount" } } },
         ]).toArray(),
+        fluxTx.aggregate([
+          {
+            $match: {
+              user: { $in: userIds },
+              type: "deposit",
+              status: { $in: approvedStatuses },
+              createdAt: { $gte: monthStart, $lte: monthEnd },
+            },
+          },
+          { $group: { _id: null, total: { $sum: "$amount" } } },
+        ]).toArray(),
+        xpayTx.aggregate([
+          {
+            $match: {
+              user: { $in: userIds },
+              type: "deposit",
+              status: { $in: approvedStatuses },
+              createdAt: { $gte: monthStart, $lte: monthEnd },
+            },
+          },
+          { $group: { _id: null, total: { $sum: "$amount" } } },
+        ]).toArray(),
       ])
       totalDeposits = (forcelabAgg[0]?.total ?? 0) + (meeldevAgg[0]?.total ?? 0)
+        + (fluxAgg[0]?.total ?? 0) + (xpayAgg[0]?.total ?? 0)
     }
 
     // Commission = partner's rate or default 10%

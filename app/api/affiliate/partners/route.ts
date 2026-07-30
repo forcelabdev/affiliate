@@ -20,8 +20,9 @@ export async function GET(req: NextRequest) {
     const meeldevTx = db.collection("meeldevtransactions")
     const approvedStatuses = ["approved", "completed", "success", "confirmed"]
 
-    // Neon'dan tüm partnerleri çek
-    let neonPartners: { username: string; ref_code: string; name?: string; commission_rate?: number; commission_type?: string; short_link?: string }[] = []
+    // Tüm partnerleri hem Neon'dan hem MongoDB affiliate_users koleksiyonundan çek
+    type PartnerRow = { id?: number | string; username: string; ref_code: string; name?: string; commission_rate?: number; commission_type?: string; short_link?: string; ticket_enabled?: boolean; ticket_threshold?: number; ticket_start_date?: string | null }
+    let neonPartners: PartnerRow[] = []
     const databaseUrl = process.env.DATABASE_URL
     if (databaseUrl) {
       try {
@@ -29,10 +30,55 @@ export async function GET(req: NextRequest) {
         const sql = neon(databaseUrl)
         try { await sql`ALTER TABLE affiliate_users ADD COLUMN IF NOT EXISTS short_link TEXT` } catch (_) {}
         const rows = await sql`SELECT id, username, ref_code, name, commission_rate, commission_type, short_link, ticket_enabled, ticket_threshold, ticket_start_date FROM affiliate_users WHERE ref_code IS NOT NULL AND role IN ('partner', 'affiliate_user')`
-        neonPartners = rows as typeof neonPartners
+        neonPartners = rows as PartnerRow[]
       } catch (e) {
         console.error("[partners] Neon error:", e)
       }
+    }
+
+    // Also load from MongoDB affiliate_users collection — these are the REAL partners
+    // whose ref_codes actually exist in users.affiliates.redeemedCode
+    const mongoAffUsers = await db.collection("affiliate_users").find({}).toArray()
+    const neonUsernames = new Set(neonPartners.map((p) => p.username?.toLowerCase()))
+    for (const doc of mongoAffUsers) {
+      const uname = doc.username || ""
+      const rawRef = doc.refCode || doc.ref_code
+      if (!rawRef || rawRef === "NULL" || rawRef === "null") continue
+      if (neonUsernames.has(uname.toLowerCase())) continue // already in Neon list
+      if (doc.role === "superadmin") continue              // skip superadmin
+      neonPartners.push({
+        id: String(doc._id),
+        username: uname,
+        ref_code: String(rawRef),
+        name: doc.name,
+        commission_rate: doc.commissionRate ?? doc.commission_rate ?? 10,
+        commission_type: doc.commissionType ?? doc.commission_type ?? "deposit",
+        short_link: null,
+        ticket_enabled: false,
+        ticket_threshold: 1000,
+        ticket_start_date: null,
+      })
+    }
+
+    // Additionally, create "orphan" partner entries for any redeemedCode that has NO partner definition
+    // so that admins can see ALL referral groups even when the partner account was never created
+    const allRedeemedCodes: string[] = (await usersCol.distinct("affiliates.redeemedCode")).filter(Boolean)
+    const knownCodes = new Set(neonPartners.map((p) => p.ref_code))
+    for (const code of allRedeemedCodes) {
+      if (!code || knownCodes.has(code)) continue
+      // Create a synthetic partner entry so this group is visible
+      neonPartners.push({
+        id: `orphan_${code}`,
+        username: code,
+        ref_code: code,
+        name: `[${code}]`,
+        commission_rate: 10,
+        commission_type: "deposit",
+        short_link: null,
+        ticket_enabled: false,
+        ticket_threshold: 1000,
+        ticket_start_date: null,
+      })
     }
 
     // Ay başı/sonu (bu ay)
@@ -41,32 +87,75 @@ export async function GET(req: NextRequest) {
     const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1)
     monthEnd.setMilliseconds(-1)
 
+    // Bulk: fetch ALL users with any affiliates data once to avoid N+1 queries
+    // Also gather all redeemedCodes so we can cross-reference unmatched Neon codes
+    const allMongoReferralUsers = await usersCol.find(
+      { "affiliates.redeemedCode": { $exists: true, $ne: null } },
+      { projection: { _id: 1, username: 1, "affiliates.redeemedCode": 1, "affiliates.referrerUsername": 1, "affiliates.referrer": 1 } }
+    ).toArray()
+
+    // Build lookup maps
+    const byRedeemedCode: Record<string, any[]> = {}
+    const byReferrerUsername: Record<string, any[]> = {}
+    for (const u of allMongoReferralUsers) {
+      const rc = u.affiliates?.redeemedCode
+      const ru = u.affiliates?.referrerUsername
+      if (rc) { if (!byRedeemedCode[rc]) byRedeemedCode[rc] = []; byRedeemedCode[rc].push(u) }
+      if (ru) { if (!byReferrerUsername[ru]) byReferrerUsername[ru] = []; byReferrerUsername[ru].push(u) }
+    }
+
+    // Also fetch users who have affiliates.code (i.e. partner accounts in MongoDB)
+    const mongoPartnerDocs = await usersCol.find(
+      { "affiliates.code": { $exists: true, $ne: null } },
+      { projection: { _id: 1, username: 1, "affiliates.code": 1 } }
+    ).toArray()
+    const mongoCodeToId: Record<string, any> = {}
+    for (const p of mongoPartnerDocs) {
+      if (p.affiliates?.code) mongoCodeToId[p.affiliates.code] = p._id
+    }
+
     // Her partner için MongoDB stats hesapla
     const partnerStats = await Promise.all(neonPartners.map(async (partner) => {
       const code = partner.ref_code
       const username = partner.username
 
-      // MongoDB'de bu partner'ın ObjectId'sini bul
+      // Find this partner's MongoDB ObjectId — try by affiliates.code match OR by username
       const mongoPartner = await usersCol.findOne(
-        { "affiliates.code": code },
-        { projection: { _id: 1 } }
+        { $or: [{ "affiliates.code": code }, { username }] },
+        { projection: { _id: 1, "affiliates.code": 1 } }
       )
+      const partnerMongoCode = mongoPartner?.affiliates?.code
 
-      // Tüm referral user condition'ları
-      const orConditions: Record<string, unknown>[] = [
-        { "affiliates.redeemedCode": code },
-        { "affiliates.referrerUsername": code },
-        { "affiliates.referrerUsername": username },
-      ]
-      if (mongoPartner) orConditions.push({ "affiliates.referrer": mongoPartner._id })
+      // Collect unique matching users using our pre-built maps
+      const matchedIds = new Set<string>()
+      const addUsers = (arr: any[]) => arr.forEach((u: any) => matchedIds.add(String(u._id)))
 
-      const referralUsers = await usersCol.find(
-        { $or: orConditions },
-        { projection: { _id: 1 } }
-      ).toArray()
+      // Match by Neon ref_code
+      if (byRedeemedCode[code]) addUsers(byRedeemedCode[code])
+      if (byReferrerUsername[code]) addUsers(byReferrerUsername[code])
+      if (byReferrerUsername[username]) addUsers(byReferrerUsername[username])
 
-      const totalReferrals = referralUsers.length
-      const userIds = referralUsers.map((u: any) => u._id)
+      // Match by MongoDB affiliates.code (the actual code stored against the partner user in mongo)
+      if (partnerMongoCode && partnerMongoCode !== code) {
+        if (byRedeemedCode[partnerMongoCode]) addUsers(byRedeemedCode[partnerMongoCode])
+        if (byReferrerUsername[partnerMongoCode]) addUsers(byReferrerUsername[partnerMongoCode])
+      }
+
+      // Match by affiliates.referrer (ObjectId reference)
+      if (mongoPartner) {
+        const refById = allMongoReferralUsers.filter((u: any) =>
+          u.affiliates?.referrer && String(u.affiliates.referrer) === String(mongoPartner._id)
+        )
+        addUsers(refById)
+      }
+
+      // Tüm referral user condition'ları (for deposit aggregation)
+      const matchedObjectIds = allMongoReferralUsers
+        .filter((u: any) => matchedIds.has(String(u._id)))
+        .map((u: any) => u._id)
+
+      const totalReferrals = matchedIds.size
+      const userIds = matchedObjectIds
 
       let totalDeposits = 0
       let totalWithdrawals = 0

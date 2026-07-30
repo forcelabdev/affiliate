@@ -61,15 +61,28 @@ export async function GET(req: NextRequest) {
       .sort({ createdAt: -1 })
       .toArray()
 
-    // 3. Neon'dan refCode → partner username map
-    const databaseUrl = process.env.DATABASE_URL
+    // 3. Build refCode → partner username map from MongoDB (source of truth for actual codes)
+    // MongoDB users with affiliates.code ARE the partner accounts — these codes match redeemedCode
     const codeToPartner: Record<string, string> = {}
+    const mongoPartnerDocs = await db.collection("users")
+      .find(
+        { "affiliates.code": { $exists: true, $ne: null } },
+        { projection: { username: 1, "affiliates.code": 1 } }
+      )
+      .toArray()
+    mongoPartnerDocs.forEach((p: any) => {
+      if (p.affiliates?.code) codeToPartner[p.affiliates.code] = p.username
+    })
+    // Also augment from Neon (Neon ref_codes might differ but still useful as fallback)
+    const databaseUrl = process.env.DATABASE_URL
     if (databaseUrl) {
       try {
         const sql = neon(databaseUrl)
         const rows = await sql`SELECT username, ref_code FROM affiliate_users WHERE ref_code IS NOT NULL`
         rows.forEach((r: any) => {
-          if (r.ref_code && r.ref_code !== "NULL") codeToPartner[r.ref_code] = r.username
+          if (r.ref_code && r.ref_code !== "NULL" && !codeToPartner[r.ref_code]) {
+            codeToPartner[r.ref_code] = r.username
+          }
         })
       } catch (e) { console.warn("[balance-analysis] Neon error:", e) }
     }
