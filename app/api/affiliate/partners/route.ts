@@ -60,27 +60,6 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    // Additionally, create "orphan" partner entries for any redeemedCode that has NO partner definition
-    // so that admins can see ALL referral groups even when the partner account was never created
-    const allRedeemedCodes: string[] = (await usersCol.distinct("affiliates.redeemedCode")).filter(Boolean)
-    const knownCodes = new Set(neonPartners.map((p) => p.ref_code))
-    for (const code of allRedeemedCodes) {
-      if (!code || knownCodes.has(code)) continue
-      // Create a synthetic partner entry so this group is visible
-      neonPartners.push({
-        id: `orphan_${code}`,
-        username: code,
-        ref_code: code,
-        name: `[${code}]`,
-        commission_rate: 10,
-        commission_type: "deposit",
-        short_link: null,
-        ticket_enabled: false,
-        ticket_threshold: 1000,
-        ticket_start_date: null,
-      })
-    }
-
     // Ay başı/sonu (bu ay)
     const now = new Date()
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)

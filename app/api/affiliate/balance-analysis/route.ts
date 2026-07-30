@@ -154,7 +154,8 @@ export async function GET(req: NextRequest) {
         const rc = u?.redeemedCode ?? null
         userBalMap[uid] = {
           userId:        uid,
-          username:      u?.username ?? uid,
+          // If user not found in MongoDB, mark username as null — filtered out below
+          username:      u?.username ?? null as any,
           name:          u?.name,
           redeemedCode:  rc,
           partnerName:   rc ? (codeToPartner[rc] ?? rc) : null,
@@ -209,8 +210,8 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    // 6. Search filter
-    let allUsers = Object.values(userBalMap)
+    // 6. Filter out users that couldn't be resolved in MongoDB (username would be null/ObjectId)
+    let allUsers = Object.values(userBalMap).filter(u => u.username != null && u.username !== "")
     if (search) {
       const s = search.toLowerCase()
       allUsers = allUsers.filter(u =>
