@@ -52,7 +52,11 @@ export async function GET(req: NextRequest) {
   // ── DETAIL MODE: return all individual transactions for one player ──────
   if (detail === "1" && usernameFilter) {
     const user = await usersCol.findOne(
-      { username: { $regex: `^${usernameFilter.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, $options: "i" }, role: { $ne: "admin" } },
+      {
+        username: { $regex: `^${usernameFilter.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, $options: "i" },
+        role: { $ne: "admin" },
+        rank: { $ne: "admin" },
+      },
       { projection: { _id: 1, username: 1, name: 1, wallets: 1 } }
     )
     if (!user) {
@@ -193,7 +197,7 @@ export async function GET(req: NextRequest) {
   }
 
   // ── LIST MODE: players with transaction summaries ────────────────────────
-  const userQuery: Record<string, unknown> = { role: { $ne: "admin" } }
+  const userQuery: Record<string, unknown> = { role: { $ne: "admin" }, rank: { $ne: "admin" } }
   if (usernameFilter) {
     userQuery.username = { $regex: usernameFilter.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), $options: "i" }
   }
@@ -240,7 +244,11 @@ export async function GET(req: NextRequest) {
   const userCodes = aggResult.map((r: any) => r._id)
   const userDocs  = userCodes.length > 0
     ? await usersCol.find(
-        { _id: { $in: userCodes.map((c: string) => { try { return new mongoose.Types.ObjectId(c) } catch { return c } }) } },
+        {
+          _id: { $in: userCodes.map((c: string) => { try { return new mongoose.Types.ObjectId(c) } catch { return c } }) },
+          role: { $ne: "admin" },
+          rank: { $ne: "admin" },
+        },
         { projection: { _id: 1, username: 1, name: 1, wallets: 1, affiliates: 1 } }
       ).toArray()
     : []
