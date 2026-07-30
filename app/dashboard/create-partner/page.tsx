@@ -145,7 +145,7 @@ export default function CreatePartnerPage() {
               className="w-full bg-secondary border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors font-mono"
             />
             <p className="text-xs text-muted-foreground">
-              Kayıt linki: <span className="font-mono text-foreground">velobet280.com/register?a={form.refCode || "..."}</span>
+              Kayıt linki: <span className="font-mono text-foreground">bizzocasino168.com/register?a={form.refCode || "..."}</span>
             </p>
           </div>
 

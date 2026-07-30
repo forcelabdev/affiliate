@@ -326,7 +326,7 @@ export default function ApplicationsPage() {
                   placeholder="örn: ebrukod"
                   className="w-full bg-secondary border border-border rounded-lg px-3 py-2.5 text-sm font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
                 />
-                <p className="text-xs text-muted-foreground">Kayıt linki: velobet280.com/register?a={approveModal.refCode || "..."}</p>
+                <p className="text-xs text-muted-foreground">Kayıt linki: bizzocasino168.com/register?a={approveModal.refCode || "..."}</p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
