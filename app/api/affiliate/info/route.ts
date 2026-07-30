@@ -102,14 +102,16 @@ export async function GET(req: NextRequest) {
     const monthEnd = new Date(trNow.getFullYear(), trNow.getMonth() + 1, 1)
     monthEnd.setMilliseconds(-1)
 
-    // Total approved deposits this month from both forcelab and meeldev (bonus hariç)
+    // Total approved deposits this month from all payment collections (bonus hariç)
     const financeTx = mongoose.connection.db!.collection("forcelabfinancetransactions")
     const meeldevTx = mongoose.connection.db!.collection("meeldevtransactions")
+    const fluxTx    = mongoose.connection.db!.collection("fluxkriptotransactions")
+    const xpayTx    = mongoose.connection.db!.collection("xpaymenttransactions")
     const approvedStatuses = ["approved", "completed", "success", "confirmed"]
 
     let totalDeposits = 0
     if (userIds.length > 0) {
-      const [forcelabAgg, meeldevAgg] = await Promise.all([
+      const [forcelabAgg, meeldevAgg, fluxAgg, xpayAgg] = await Promise.all([
         financeTx.aggregate([
           {
             $match: {
@@ -136,8 +138,31 @@ export async function GET(req: NextRequest) {
           },
           { $group: { _id: null, total: { $sum: "$amount" } } },
         ]).toArray(),
+        fluxTx.aggregate([
+          {
+            $match: {
+              user: { $in: userIds },
+              type: "deposit",
+              status: { $in: approvedStatuses },
+              createdAt: { $gte: monthStart, $lte: monthEnd },
+            },
+          },
+          { $group: { _id: null, total: { $sum: "$amount" } } },
+        ]).toArray(),
+        xpayTx.aggregate([
+          {
+            $match: {
+              user: { $in: userIds },
+              type: "deposit",
+              status: { $in: approvedStatuses },
+              createdAt: { $gte: monthStart, $lte: monthEnd },
+            },
+          },
+          { $group: { _id: null, total: { $sum: "$amount" } } },
+        ]).toArray(),
       ])
       totalDeposits = (forcelabAgg[0]?.total ?? 0) + (meeldevAgg[0]?.total ?? 0)
+        + (fluxAgg[0]?.total ?? 0) + (xpayAgg[0]?.total ?? 0)
     }
 
     // Commission = partner's rate or default 10%

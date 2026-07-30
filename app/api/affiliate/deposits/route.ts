@@ -80,6 +80,35 @@ export async function GET(req: NextRequest) {
       projection: { name: 1, username: 1, "affiliates.redeemedCode": 1, "affiliates.referredAt": 1, createdAt: 1 },
     }).toArray()
 
+    // --- Also include users who have transactions in xpay/flux even with no redeemedCode ---
+    // Collect extra user IDs from xpay and flux that are NOT already in userDocs
+    const fluxTxEarly  = mongoose.connection.db!.collection("fluxkriptotransactions")
+    const xpayTxEarly  = mongoose.connection.db!.collection("xpaymenttransactions")
+
+    const knownUserIds = new Set(userDocs.map((u: any) => String(u._id)))
+
+    const [xpayAllUserIds, fluxAllUserIds] = await Promise.all([
+      xpayTxEarly.distinct("user", { type: "deposit", status: { $in: ["approved", "completed", "success", "confirmed"] } }),
+      fluxTxEarly.distinct("user", { type: "deposit", status: { $in: ["approved", "completed", "success", "confirmed"] } }),
+    ])
+
+    const extraIds = [...new Set([...xpayAllUserIds, ...fluxAllUserIds]
+      .map(id => String(id))
+      .filter(id => !knownUserIds.has(id))
+    )]
+
+    if (extraIds.length > 0) {
+      const { ObjectId } = await import("mongodb")
+      const extraObjectIds = extraIds.flatMap(id => {
+        try { return [new ObjectId(id)] } catch { return [] }
+      })
+      const extraDocs = await users.find(
+        { _id: { $in: extraObjectIds } },
+        { projection: { name: 1, username: 1, "affiliates.redeemedCode": 1, "affiliates.referredAt": 1, createdAt: 1 } }
+      ).toArray()
+      userDocs.push(...extraDocs)
+    }
+
     if (userDocs.length === 0) {
       return NextResponse.json({ success: true, refCode, referrals: [], totalDeposits: 0, totalWithdrawals: 0 })
     }
