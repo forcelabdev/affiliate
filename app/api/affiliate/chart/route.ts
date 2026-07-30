@@ -26,44 +26,37 @@ export async function GET(req: NextRequest) {
     let orConditions: Record<string, unknown>[] = []
 
     if (isAdminAll) {
-      // Tüm partnerleri topla
-      let allCodes: string[] = []
-      let allUsernames: string[] = []
-      if (databaseUrl) {
-        try {
-          const { neon } = await import("@neondatabase/serverless")
-          const sql = neon(databaseUrl)
-          const rows = await sql`SELECT username, ref_code FROM affiliate_users WHERE ref_code IS NOT NULL`
-          allCodes = rows.map((r: any) => r.ref_code)
-          allUsernames = rows.map((r: any) => r.username)
-        } catch (e) { console.warn("[chart] Neon error:", e) }
-      }
-      const mongoPartners = await usersCol.find(
-        { "affiliates.code": { $in: allCodes } },
-        { projection: { _id: 1 } }
-      ).toArray()
+      // Use MongoDB's own referral fields — do NOT filter through Neon ref_codes
+      // because Neon ref_codes may not match actual MongoDB affiliates.redeemedCode values.
+      const allPartnerIds: any[] = (await usersCol.distinct("affiliates.referrer")).filter(Boolean)
+      const allReferrerUsernames: string[] = (await usersCol.distinct("affiliates.referrerUsername")).filter((v: any) => v && typeof v === "string")
       orConditions = [
-        { "affiliates.redeemedCode": { $in: allCodes } },
-        { "affiliates.referrerUsername": { $in: [...allCodes, ...allUsernames] } },
-        { "affiliates.referrer": { $in: mongoPartners.map((p: any) => p._id) } },
+        { "affiliates.redeemedCode": { $exists: true, $ne: null } },
       ]
+      if (allPartnerIds.length > 0) orConditions.push({ "affiliates.referrer": { $in: allPartnerIds } })
+      if (allReferrerUsernames.length > 0) orConditions.push({ "affiliates.referrerUsername": { $in: allReferrerUsernames } })
     } else {
       let partnerUsername: string | null = null
       if (databaseUrl) {
         try {
           const { neon } = await import("@neondatabase/serverless")
           const sql = neon(databaseUrl)
-          const rows = await sql`SELECT username FROM affiliate_users WHERE ref_code = ${refCode}`
+          const rows = await sql`SELECT username FROM affiliate_users WHERE ref_code = ${refCode} OR username = ${session.username}`
           if (rows?.length > 0) partnerUsername = rows[0].username
         } catch (e) { console.warn("[chart] Neon error:", e) }
       }
-      const partner = await usersCol.findOne({ "affiliates.code": refCode }, { projection: { _id: 1 } })
+      const partner = await usersCol.findOne(
+        { $or: [{ "affiliates.code": refCode }, { username: session.username }] },
+        { projection: { _id: 1, "affiliates.code": 1 } }
+      )
+      const partnerMongoCode = partner?.affiliates?.code
       orConditions = [
         { "affiliates.redeemedCode": refCode },
         { "affiliates.referrerUsername": refCode },
       ]
       if (partner) orConditions.push({ "affiliates.referrer": partner._id })
-      if (partnerUsername) orConditions.push({ "affiliates.referrerUsername": partnerUsername })
+      if (partnerUsername && partnerUsername !== refCode) orConditions.push({ "affiliates.referrerUsername": partnerUsername })
+      if (partnerMongoCode && partnerMongoCode !== refCode) orConditions.push({ "affiliates.redeemedCode": partnerMongoCode })
     }
 
     const referralUsers = await usersCol.find({ $or: orConditions }, { projection: { _id: 1 } }).toArray()

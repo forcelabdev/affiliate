@@ -39,27 +39,15 @@ export async function GET(req: NextRequest) {
     let orConditions: Record<string, unknown>[] = []
 
     if (!refCode && isAdmin) {
-      // Superadmin: tüm partnerlerin referral kullanıcılarını çek
-      let allCodes: string[] = []
-      let allUsernames: string[] = []
-      if (databaseUrl) {
-        try {
-          const { neon } = await import("@neondatabase/serverless")
-          const sql = neon(databaseUrl)
-          const rows = await sql`SELECT username, ref_code FROM affiliate_users WHERE ref_code IS NOT NULL`
-          allCodes = rows.map((r: any) => r.ref_code)
-          allUsernames = rows.map((r: any) => r.username)
-        } catch (e) { console.warn("[deposits] Neon error:", e) }
-      }
-      const mongoPartners = await users.find(
-        { "affiliates.code": { $in: allCodes } },
-        { projection: { _id: 1 } }
-      ).toArray()
+      // Superadmin: use MongoDB's own referral fields directly — do NOT filter through Neon
+      // ref_codes because Neon ref_codes may not match actual MongoDB affiliates values.
+      const allPartnerIds: any[] = (await users.distinct("affiliates.referrer")).filter(Boolean)
+      const allReferrerUsernames: string[] = (await users.distinct("affiliates.referrerUsername")).filter((v: any) => v && typeof v === "string")
       orConditions = [
-        { "affiliates.redeemedCode": { $in: allCodes } },
-        { "affiliates.referrerUsername": { $in: [...allCodes, ...allUsernames] } },
-        { "affiliates.referrer": { $in: mongoPartners.map((p: any) => p._id) } },
+        { "affiliates.redeemedCode": { $exists: true, $ne: null } },
       ]
+      if (allPartnerIds.length > 0) orConditions.push({ "affiliates.referrer": { $in: allPartnerIds } })
+      if (allReferrerUsernames.length > 0) orConditions.push({ "affiliates.referrerUsername": { $in: allReferrerUsernames } })
     } else {
       if (!refCode) return NextResponse.json({ success: false, message: "Ref kodu bulunamadı." }, { status: 400 })
 
@@ -76,11 +64,16 @@ export async function GET(req: NextRequest) {
         }
       }
 
-      const partner = await users.findOne({ "affiliates.code": refCode }, { projection: { _id: 1 } })
+      const partner = await users.findOne(
+        { $or: [{ "affiliates.code": refCode }, { username: session.username }] },
+        { projection: { _id: 1, "affiliates.code": 1 } }
+      )
+      const partnerMongoCode = partner?.affiliates?.code
 
       orConditions = [{ "affiliates.redeemedCode": refCode }, { "affiliates.referrerUsername": refCode }]
       if (partner) orConditions.push({ "affiliates.referrer": partner._id })
-      if (partnerUsername) orConditions.push({ "affiliates.referrerUsername": partnerUsername })
+      if (partnerUsername && partnerUsername !== refCode) orConditions.push({ "affiliates.referrerUsername": partnerUsername })
+      if (partnerMongoCode && partnerMongoCode !== refCode) orConditions.push({ "affiliates.redeemedCode": partnerMongoCode })
     }
 
     const userDocs = await users.find({ $or: orConditions }, {
@@ -205,15 +198,23 @@ export async function GET(req: NextRequest) {
       withdrawalByUser[uid] = (withdrawalByUser[uid] ?? 0) + (t.amount ?? 0)
     }
 
-    // Build ref_code → partner username map from Neon
+    // Build ref_code → partner username map: MongoDB is the source of truth for actual codes
     const codeToPartner: Record<string, string> = {}
+    const mongoPartnerDocs = await users.find(
+      { "affiliates.code": { $exists: true, $ne: null } },
+      { projection: { username: 1, "affiliates.code": 1 } }
+    ).toArray()
+    for (const p of mongoPartnerDocs) {
+      if (p.affiliates?.code) codeToPartner[p.affiliates.code] = p.username
+    }
+    // Augment from Neon as fallback for any codes not in MongoDB
     if (databaseUrl) {
       try {
         const { neon } = await import("@neondatabase/serverless")
         const sql = neon(databaseUrl)
         const rows = await sql`SELECT username, ref_code FROM affiliate_users WHERE ref_code IS NOT NULL`
         for (const row of rows) {
-          if (row.ref_code && row.ref_code !== "NULL") {
+          if (row.ref_code && row.ref_code !== "NULL" && !codeToPartner[row.ref_code]) {
             codeToPartner[row.ref_code] = row.username
           }
         }
