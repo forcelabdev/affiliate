@@ -12,8 +12,17 @@ export async function GET(req: NextRequest) {
 
   const requestedCode = searchParams.get("refCode")
   const startDateParam = searchParams.get("startDate")
-  const refCode = session.role === "admin" ? requestedCode || session.refCode : session.refCode
-  if (!refCode) return NextResponse.json({ success: false, message: "Ref kodu bulunamadı." }, { status: 400 })
+
+  const isAdminAll = (session.role === "superadmin" || session.role === "admin") && !requestedCode
+  const refCode = isAdminAll
+    ? null
+    : (session.role === "superadmin" || session.role === "admin")
+      ? requestedCode || session.refCode
+      : session.refCode
+
+  if (!isAdminAll && !refCode) {
+    return NextResponse.json({ success: false, message: "Ref kodu bulunamadı." }, { status: 400 })
+  }
 
   try {
     await connectDB()
@@ -35,21 +44,28 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const partner = await users.findOne({ "affiliates.code": refCode }, { projection: { _id: 1 } })
-    
-    // Query: check redeemedCode (old system) OR referrer ObjectId (old system) OR referrerUsername (transferred users)
-    const orConditions: Record<string, unknown>[] = [
-      { "affiliates.redeemedCode": refCode },
-    ]
-    if (partner) {
-      orConditions.push({ "affiliates.referrer": partner._id })
+    let query: Record<string, unknown>
+
+    if (isAdminAll) {
+      // Superadmin: tüm referral kullanıcıları
+      const allPartnerIds: any[] = (await users.distinct("affiliates.referrer")).filter(Boolean)
+      const allReferrerUsernames: string[] = (await users.distinct("affiliates.referrerUsername")).filter((v: any) => v && typeof v === "string")
+      const orConditions: Record<string, unknown>[] = [
+        { "affiliates.redeemedCode": { $exists: true, $ne: null } },
+      ]
+      if (allPartnerIds.length > 0) orConditions.push({ "affiliates.referrer": { $in: allPartnerIds } })
+      if (allReferrerUsernames.length > 0) orConditions.push({ "affiliates.referrerUsername": { $in: allReferrerUsernames } })
+      query = { $or: orConditions }
+    } else {
+      const partner = await users.findOne({ "affiliates.code": refCode }, { projection: { _id: 1 } })
+      const orConditions: Record<string, unknown>[] = [
+        { "affiliates.redeemedCode": refCode },
+      ]
+      if (partner) orConditions.push({ "affiliates.referrer": partner._id })
+      if (partnerUsername) orConditions.push({ "affiliates.referrerUsername": partnerUsername })
+      orConditions.push({ "affiliates.referrerUsername": refCode })
+      query = { $or: orConditions }
     }
-    if (partnerUsername) {
-      orConditions.push({ "affiliates.referrerUsername": partnerUsername })
-    }
-    orConditions.push({ "affiliates.referrerUsername": refCode })
-    
-    const query: Record<string, unknown> = { $or: orConditions }
 
     const userDocs = await users.find(query, {
       projection: { name: 1, username: 1, "affiliates.redeemedCode": 1, "affiliates.referredAt": 1, createdAt: 1 },
