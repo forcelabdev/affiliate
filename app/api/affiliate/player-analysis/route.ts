@@ -256,24 +256,30 @@ export async function GET(req: NextRequest) {
   const userDocMap: Record<string, any> = {}
   userDocs.forEach((u: any) => { userDocMap[String(u._id)] = u })
 
-  const players = aggResult.map((r: any) => {
-    const u = userDocMap[r._id]
-    const wallets: any[] = Array.isArray(u?.wallets) ? u.wallets : []
-    const rivoWallet = wallets.find((w: any) => w?.coinType === "Rivo")
-    return {
-      userId:      r._id,
-      username:    u?.username ?? r._id,
-      name:        u?.name ?? null,
-      currentBalance: rivoWallet?.balance ?? 0,
-      redeemedCode:   u?.affiliates?.redeemedCode ?? null,
-      totalBet:    r.totalBet,
-      totalWin:    r.totalWin,
-      totalProfit: r.totalWin - r.totalBet,
-      txnCount:    r.txnCount,
-      lastTxn:     r.lastTxn,
-      providers:   (r.providers ?? []).filter(Boolean).slice(0, 5),
-    }
-  })
+  const players = aggResult
+    .filter((r: any) => {
+      const u = userDocMap[r._id]
+      // Exclude entries where the user was not found in MongoDB (username would fall back to raw ObjectId)
+      return u != null && u.username
+    })
+    .map((r: any) => {
+      const u = userDocMap[r._id]
+      const wallets: any[] = Array.isArray(u?.wallets) ? u.wallets : []
+      const rivoWallet = wallets.find((w: any) => w?.coinType === "Rivo")
+      return {
+        userId:      r._id,
+        username:    u.username,
+        name:        u?.name ?? null,
+        currentBalance: rivoWallet?.balance ?? 0,
+        redeemedCode:   u?.affiliates?.redeemedCode ?? null,
+        totalBet:    r.totalBet,
+        totalWin:    r.totalWin,
+        totalProfit: r.totalWin - r.totalBet,
+        txnCount:    r.txnCount,
+        lastTxn:     r.lastTxn,
+        providers:   (r.providers ?? []).filter(Boolean).slice(0, 5),
+      }
+    })
 
   // Global summary
   const summaryPipeline: object[] = [
