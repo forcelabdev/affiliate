@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
       commissionType,
     })
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       token,
       user: {
@@ -93,6 +93,20 @@ export async function POST(req: NextRequest) {
         commissionType,
       },
     })
+
+    // Set HttpOnly cookie so both bizzo.partners and www.bizzo.partners share the same token.
+    // domain=".bizzo.partners" covers both the apex and www subdomain.
+    const isProd = process.env.NODE_ENV === "production"
+    response.cookies.set("affiliate_token", token, {
+      httpOnly: false,          // client JS must also read it for localStorage fallback
+      secure: isProd,
+      sameSite: "lax",
+      maxAge: 8 * 60 * 60,     // 8 hours — same as JWT exp
+      path: "/",
+      domain: isProd ? ".bizzo.partners" : undefined,
+    })
+
+    return response
   } catch (err) {
     console.error("[v0] Auth error:", err)
     return NextResponse.json({ success: false, message: "Sunucu hatası." }, { status: 500 })
