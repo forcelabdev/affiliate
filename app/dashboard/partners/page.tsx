@@ -447,10 +447,10 @@ export default function PartnersPage() {
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Referans Linki</p>
               <div className="flex items-center gap-2 bg-secondary border border-border rounded-lg px-3 py-2">
                 <span className="flex-1 text-xs font-mono text-foreground truncate">
-                  https://bizzocasino168.com/register?a={selected.refCode}
+                  https://bizzocasino168.com/?register={selected.refCode}
                 </span>
                 <button
-                  onClick={() => handleCopy(`https://bizzocasino168.com/register?a=${selected.refCode}`, "reflink")}
+                  onClick={() => handleCopy(`https://bizzocasino168.com/?register=${selected.refCode}`, "reflink")}
                   className="flex-shrink-0 text-xs bg-primary text-primary-foreground px-3 py-1.5 rounded-md font-medium hover:bg-primary/90 transition-colors"
                 >
                   {copied === "reflink" ? "Kopyalandı!" : "Kopyala"}
