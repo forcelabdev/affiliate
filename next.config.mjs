@@ -40,19 +40,6 @@ const nextConfig = {
     unoptimized: true,
   },
   turbopack: {},
-  async redirects() {
-    return [
-      // www.bizzo.partners → bizzo.partners (canonical apex domain)
-      // This prevents the localStorage origin-isolation bug where a user logs in on
-      // bizzo.partners but the page redirects to www.bizzo.partners (different origin).
-      {
-        source: "/:path*",
-        has: [{ type: "host", value: "www.bizzo.partners" }],
-        destination: "https://bizzo.partners/:path*",
-        permanent: true,
-      },
-    ]
-  },
   async headers() {
     return [
       {
