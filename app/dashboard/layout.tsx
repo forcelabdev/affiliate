@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
-import Image from "next/image"
 
 function useDarkMode() {
   const [dark, setDark] = useState(false)
@@ -143,6 +142,16 @@ const ADMIN_NAV = [
     ),
     superadminOnly: true,
   },
+  {
+    href: "/dashboard/bulk-bonus",
+    label: "Toplu Bonus",
+    icon: (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
+      </svg>
+    ),
+    superadminOnly: true,
+  },
 
   {
     href: "/dashboard/player-analysis",
@@ -256,15 +265,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       >
         {/* Brand */}
         <div className="flex items-center justify-center px-5 py-5 border-b border-sidebar-border">
-          <Image
-            src="/powered_by.svg"
-            alt="Logo"
-            width={140}
-            height={62}
-            className="object-contain"
-            style={{ width: "140px", height: "auto" }}
-            priority
-          />
+          <div className="text-center select-none">
+            <h1 className="text-2xl font-black tracking-wider uppercase text-foreground">
+              BIZZO <span style={{ color: "#f5c842" }}>CASINO</span>
+            </h1>
+            <p className="text-[10px] text-muted-foreground tracking-[0.3em] uppercase mt-0.5">Partners</p>
+          </div>
         </div>
 
         {/* User Badge */}

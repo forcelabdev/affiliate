@@ -221,6 +221,23 @@ export async function GET(req: NextRequest) {
     txnMatchStage.user_code = { $in: matchingUsers.map((u: any) => String(u._id)) }
   }
 
+  // Fetch all admin/banned user IDs upfront so we can exclude them from the pipeline.
+  // MongoDB stores _id as ObjectId but transactions store user_code as string of that ObjectId.
+  // Using $nin in the pipeline ensures admins never appear regardless of userDocMap misses.
+  const adminUsers = await usersCol
+    .find(
+      { $or: [{ role: "admin" }, { rank: "admin" }] },
+      { projection: { _id: 1 } }
+    )
+    .toArray()
+  const adminUserCodes = adminUsers.map((u: any) => String(u._id))
+
+  if (adminUserCodes.length > 0) {
+    txnMatchStage.user_code = txnMatchStage.user_code
+      ? { ...(txnMatchStage.user_code as object), $nin: adminUserCodes }
+      : { $nin: adminUserCodes }
+  }
+
   const pipeline: object[] = [
     { $match: txnMatchStage },
     {
@@ -281,7 +298,7 @@ export async function GET(req: NextRequest) {
       }
     })
 
-  // Global summary
+  // Global summary (txnMatchStage already excludes admin user_codes from above)
   const summaryPipeline: object[] = [
     { $match: txnMatchStage },
     {

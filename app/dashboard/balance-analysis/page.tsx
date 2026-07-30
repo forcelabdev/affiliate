@@ -127,6 +127,9 @@ export default function BalanceAnalysisPage() {
   const [period, setPeriod]           = useState("all")
   const [customStart, setCustomStart] = useState("")
   const [customEnd, setCustomEnd]     = useState("")
+  // appliedStart/End are only updated when the user clicks "Uygula" — never on every keystroke
+  const [appliedStart, setAppliedStart] = useState("")
+  const [appliedEnd, setAppliedEnd]     = useState("")
   const [search, setSearch]           = useState("")
   const [searchInput, setSearchInput] = useState("")
   const searchTimeout                  = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -151,8 +154,8 @@ export default function BalanceAnalysisPage() {
       if (search) params.set("search", search)
       const range = period === "custom"
         ? {
-            startDate: customStart ? new Date(customStart).getTime() : undefined,
-            endDate:   customEnd   ? new Date(customEnd + "T23:59:59").getTime() : undefined,
+            startDate: appliedStart ? new Date(appliedStart).getTime() : undefined,
+            endDate:   appliedEnd   ? new Date(appliedEnd + "T23:59:59").getTime() : undefined,
           }
         : getDateRange(period)
       if (range.startDate) params.set("startDate", String(range.startDate))
@@ -172,7 +175,7 @@ export default function BalanceAnalysisPage() {
       }
     } catch (e) { console.error("[BalanceAnalysis] fetch error:", e) }
     finally { setLoading(false) }
-  }, [token, period, customStart, customEnd, search])
+  }, [token, period, appliedStart, appliedEnd, search])
 
   useEffect(() => { if (token) fetchData(1) }, [fetchData, token])
 
@@ -221,7 +224,7 @@ export default function BalanceAnalysisPage() {
         {PERIODS.map(p => (
           <button
             key={p.value}
-            onClick={() => setPeriod(p.value)}
+            onClick={() => { setPeriod(p.value); if (p.value !== "custom") { setAppliedStart(""); setAppliedEnd("") } }}
             className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors border ${
               period === p.value
                 ? "bg-primary text-primary-foreground border-primary"
@@ -246,7 +249,8 @@ export default function BalanceAnalysisPage() {
             <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)}
               className="px-3 py-1.5 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"/>
           </div>
-          <button onClick={() => fetchData(1)}
+          <button
+            onClick={() => { setAppliedStart(customStart); setAppliedEnd(customEnd) }}
             className="px-4 py-1.5 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors">
             Uygula
           </button>
