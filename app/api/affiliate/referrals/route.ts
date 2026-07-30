@@ -33,12 +33,18 @@ async function getMonthlyStats(userIds: any[], db: any) {
 
   const fl   = db.collection("forcelabfinancetransactions")
   const meel = db.collection("meeldevtransactions")
+  const xpay = db.collection("xpaymenttransactions")
+  const flux = db.collection("fluxkriptotransactions")
 
-  const [flDep, flWit, meelDep, meelWit, rivoUsers] = await Promise.all([
+  const [flDep, flWit, meelDep, meelWit, xpayDep, xpayWit, fluxDep, fluxWit, rivoUsers] = await Promise.all([
     fl.find({ user: { $in: userIds }, providerType: "deposit",                          status: { $in: APPROVED }, createdAt: { $gte: monthStart, $lte: monthEnd }, ...NO_BONUS }, { projection: { user: 1, amount: 1 } }).toArray(),
     fl.find({ user: { $in: userIds }, providerType: { $in: ["withdraw","withdrawal"] }, status: { $in: APPROVED }, createdAt: { $gte: monthStart, $lte: monthEnd } },             { projection: { user: 1, amount: 1 } }).toArray(),
     meel.find({ user: { $in: userIds }, type: "deposit",                          status: { $in: APPROVED }, createdAt: { $gte: monthStart, $lte: monthEnd }, ...NO_BONUS }, { projection: { user: 1, amount: 1 } }).toArray(),
     meel.find({ user: { $in: userIds }, type: { $in: ["withdraw","withdrawal"] }, status: { $in: APPROVED }, createdAt: { $gte: monthStart, $lte: monthEnd } },             { projection: { user: 1, amount: 1 } }).toArray(),
+    xpay.find({ user: { $in: userIds }, type: "deposit",                          status: { $in: APPROVED }, createdAt: { $gte: monthStart, $lte: monthEnd } }, { projection: { user: 1, amount: 1 } }).toArray(),
+    xpay.find({ user: { $in: userIds }, type: { $in: ["withdraw","withdrawal"] }, status: { $in: APPROVED }, createdAt: { $gte: monthStart, $lte: monthEnd } }, { projection: { user: 1, amount: 1 } }).toArray(),
+    flux.find({ user: { $in: userIds }, type: "deposit",                          status: { $in: APPROVED }, createdAt: { $gte: monthStart, $lte: monthEnd } }, { projection: { user: 1, amount: 1 } }).toArray(),
+    flux.find({ user: { $in: userIds }, type: { $in: ["withdraw","withdrawal"] }, status: { $in: APPROVED }, createdAt: { $gte: monthStart, $lte: monthEnd } }, { projection: { user: 1, amount: 1 } }).toArray(),
     db.collection("users").find({ _id: { $in: userIds } }, { projection: { _id: 1, wallets: 1 } }).toArray(),
   ])
 
@@ -46,8 +52,8 @@ async function getMonthlyStats(userIds: any[], db: any) {
   const witByUser: Record<string, number> = {}
   const rivoByUser: Record<string, number> = {}
 
-  for (const t of [...flDep, ...meelDep])  { const k = String(t.user); depByUser[k] = (depByUser[k] ?? 0) + (t.amount ?? 0) }
-  for (const t of [...flWit, ...meelWit])  { const k = String(t.user); witByUser[k] = (witByUser[k] ?? 0) + (t.amount ?? 0) }
+  for (const t of [...flDep, ...meelDep, ...xpayDep, ...fluxDep]) { const k = String(t.user); depByUser[k] = (depByUser[k] ?? 0) + (t.amount ?? 0) }
+  for (const t of [...flWit, ...meelWit, ...xpayWit, ...fluxWit]) { const k = String(t.user); witByUser[k] = (witByUser[k] ?? 0) + (t.amount ?? 0) }
   for (const u of rivoUsers) {
     const k = String(u._id)
     const wallet = (Array.isArray(u.wallets) ? u.wallets : []).find((w: any) => w?.coinType === "Rivo")
