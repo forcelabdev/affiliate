@@ -19,6 +19,8 @@ export async function GET(req: NextRequest) {
     const financeTx = db.collection("forcelabfinancetransactions")
     const meeldevTx = db.collection("meeldevtransactions")
     const approvedStatuses = ["approved", "completed", "success", "confirmed"]
+    const fluxTx = db.collection("fluxkriptotransactions")
+    const xpayTx = db.collection("xpaymenttransactions")
 
     // Tüm partnerleri hem Neon'dan hem MongoDB affiliate_users koleksiyonundan çek
     type PartnerRow = { id?: number | string; username: string; ref_code: string; name?: string; commission_rate?: number; commission_type?: string; short_link?: string; ticket_enabled?: boolean; ticket_threshold?: number; ticket_start_date?: string | null }
@@ -145,7 +147,7 @@ export async function GET(req: NextRequest) {
           providerName: { $not: { $regex: /bonus/i } },
           providerSlug: { $not: { $regex: /bonus/i } },
         }
-        const [forcelabDepAgg, forcelabWitAgg, meeldevDepAgg, meeldevWitAgg] = await Promise.all([
+        const [forcelabDepAgg, forcelabWitAgg, meeldevDepAgg, meeldevWitAgg, fluxDepAgg, fluxWitAgg, xpayDepAgg, xpayWitAgg] = await Promise.all([
           // Forcelab deposits
           financeTx.aggregate([
             { $match: { user: { $in: userIds }, providerType: "deposit", status: { $in: approvedStatuses }, createdAt: { $gte: monthStart, $lte: monthEnd }, ...notBonusFilter } },
@@ -166,9 +168,29 @@ export async function GET(req: NextRequest) {
             { $match: { user: { $in: userIds }, type: { $in: ["withdraw", "withdrawal"] }, status: { $in: approvedStatuses }, createdAt: { $gte: monthStart, $lte: monthEnd } } },
             { $group: { _id: null, total: { $sum: "$amount" } } },
           ]).toArray(),
+          // FluxKripto deposits
+          fluxTx.aggregate([
+            { $match: { user: { $in: userIds }, type: "deposit", status: { $in: approvedStatuses }, createdAt: { $gte: monthStart, $lte: monthEnd } } },
+            { $group: { _id: null, total: { $sum: "$amount" } } },
+          ]).toArray(),
+          // FluxKripto withdrawals
+          fluxTx.aggregate([
+            { $match: { user: { $in: userIds }, type: { $in: ["withdraw", "withdrawal"] }, status: { $in: approvedStatuses }, createdAt: { $gte: monthStart, $lte: monthEnd } } },
+            { $group: { _id: null, total: { $sum: "$amount" } } },
+          ]).toArray(),
+          // XPayment deposits
+          xpayTx.aggregate([
+            { $match: { user: { $in: userIds }, type: "deposit", status: { $in: approvedStatuses }, createdAt: { $gte: monthStart, $lte: monthEnd } } },
+            { $group: { _id: null, total: { $sum: "$amount" } } },
+          ]).toArray(),
+          // XPayment withdrawals
+          xpayTx.aggregate([
+            { $match: { user: { $in: userIds }, type: { $in: ["withdraw", "withdrawal"] }, status: { $in: approvedStatuses }, createdAt: { $gte: monthStart, $lte: monthEnd } } },
+            { $group: { _id: null, total: { $sum: "$amount" } } },
+          ]).toArray(),
         ])
-        totalDeposits = (forcelabDepAgg[0]?.total ?? 0) + (meeldevDepAgg[0]?.total ?? 0)
-        totalWithdrawals = (forcelabWitAgg[0]?.total ?? 0) + (meeldevWitAgg[0]?.total ?? 0)
+        totalDeposits = (forcelabDepAgg[0]?.total ?? 0) + (meeldevDepAgg[0]?.total ?? 0) + (fluxDepAgg[0]?.total ?? 0) + (xpayDepAgg[0]?.total ?? 0)
+        totalWithdrawals = (forcelabWitAgg[0]?.total ?? 0) + (meeldevWitAgg[0]?.total ?? 0) + (fluxWitAgg[0]?.total ?? 0) + (xpayWitAgg[0]?.total ?? 0)
       }
 
       const commissionRate = partner.commission_rate ?? 10
