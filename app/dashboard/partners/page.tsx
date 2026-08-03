@@ -47,6 +47,17 @@ export default function PartnersPage() {
   const [copied, setCopied] = useState<string | null>(null)
   const [isSuperAdmin, setIsSuperAdmin] = useState(false)
 
+  // Period filter
+  type Period = "today" | "week" | "month" | "all" | "custom"
+  const [period, setPeriod] = useState<Period>("month")
+  const [customStart, setCustomStart] = useState("")
+  const [customEnd, setCustomEnd] = useState("")
+
+  // Delete confirm
+  const [deleteTarget, setDeleteTarget] = useState<PartnerStats | null>(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
+  const [deleteError, setDeleteError] = useState("")
+
   // Ticket settings modal
   const [ticketPartner, setTicketPartner] = useState<PartnerStats | null>(null)
   const [ticketForm, setTicketForm] = useState({ enabled: false, threshold: 1000, goal: 10000, startDate: "" })
@@ -179,13 +190,18 @@ export default function PartnersPage() {
     }
   }, [])
 
-  const fetchPartners = useCallback(async (t: string) => {
+  const fetchPartners = useCallback(async (
+    t: string,
+    p: "today" | "week" | "month" | "all" | "custom" = "month",
+    start = "",
+    end = ""
+  ) => {
     setLoading(true)
     setError("")
     try {
-      const res = await fetch("/api/affiliate/partners", {
-        headers: { "x-auth-token": t },
-      })
+      let url = `/api/affiliate/partners?period=${p}`
+      if (p === "custom" && start && end) url += `&start=${start}&end=${end}`
+      const res = await fetch(url, { headers: { "x-auth-token": t } })
       const data = await res.json()
       if (!data.success) {
         setError("Veriler yüklenemedi. Lütfen tekrar deneyin.")
@@ -208,9 +224,45 @@ export default function PartnersPage() {
       const user = JSON.parse(userData)
       if (user.role !== "admin" && user.role !== "superadmin") { router.push("/dashboard"); return }
       setIsSuperAdmin(user.role === "superadmin")
-      fetchPartners(t)
+      fetchPartners(t, "month")
     } catch { router.push("/") }
   }, [router, fetchPartners])
+
+  async function handleDelete() {
+    if (!deleteTarget) return
+    setDeleteLoading(true)
+    setDeleteError("")
+    try {
+      const t = localStorage.getItem("affiliate_token") || ""
+      const res = await fetch(`/api/affiliate/delete-partner?username=${encodeURIComponent(deleteTarget.username)}`, {
+        method: "DELETE",
+        headers: { "x-auth-token": t },
+      })
+      const data = await res.json()
+      if (!data.success) {
+        setDeleteError(data.message || "İşlem gerçekleştirilemedi.")
+      } else {
+        setPartners((prev) => prev.filter((p) => p.username !== deleteTarget.username))
+        setDeleteTarget(null)
+      }
+    } catch {
+      setDeleteError("Sunucu hatası.")
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
+
+  function applyPeriod(p: "today" | "week" | "month" | "all" | "custom") {
+    const t = localStorage.getItem("affiliate_token") || ""
+    setPeriod(p)
+    if (p !== "custom") fetchPartners(t, p)
+  }
+
+  function applyCustom() {
+    if (!customStart || !customEnd) return
+    const t = localStorage.getItem("affiliate_token") || ""
+    fetchPartners(t, "custom", customStart, customEnd)
+  }
 
   const filtered = partners.filter((p) =>
     p.username.toLowerCase().includes(search.toLowerCase()) ||
@@ -234,7 +286,7 @@ export default function PartnersPage() {
           </p>
         </div>
         <button
-          onClick={() => fetchPartners(token)}
+          onClick={() => fetchPartners(token, period, customStart, customEnd)}
           disabled={loading}
           className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
         >
@@ -245,14 +297,60 @@ export default function PartnersPage() {
         </button>
       </div>
 
+      {/* Period Filter */}
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
+          {(["today", "week", "month", "all", "custom"] as const).map((p) => {
+            const labels: Record<string, string> = { today: "Bugün", week: "Bu Hafta", month: "Bu Ay", all: "Tüm Zamanlar", custom: "Ozel Tarih" }
+            return (
+              <button
+                key={p}
+                onClick={() => applyPeriod(p)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${
+                  period === p
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-card border-border text-muted-foreground hover:text-foreground hover:bg-secondary"
+                }`}
+              >
+                {labels[p]}
+              </button>
+            )
+          })}
+        </div>
+        {period === "custom" && (
+          <div className="flex items-center gap-3 flex-wrap">
+            <input
+              type="date"
+              value={customStart}
+              onChange={(e) => setCustomStart(e.target.value)}
+              className="bg-card border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+            <span className="text-muted-foreground text-sm">—</span>
+            <input
+              type="date"
+              value={customEnd}
+              onChange={(e) => setCustomEnd(e.target.value)}
+              className="bg-card border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+            <button
+              onClick={applyCustom}
+              disabled={!customStart || !customEnd || loading}
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+            >
+              Uygula
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         {[
           { label: "Toplam Partner", value: partners.length, suffix: "kişi", icon: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" },
           { label: "Toplam Referral", value: totalReferrals, suffix: "üye", icon: "M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197" },
-          { label: "Bu Ay Deposit", value: `₺${totalDeposits.toLocaleString("tr-TR")}`, suffix: "", icon: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" },
-          { label: "Bu Ay Çekim", value: `₺${totalWithdrawals.toLocaleString("tr-TR")}`, suffix: "", icon: "M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" },
-          { label: "Bu Ay Komisyon", value: `₺${totalEarnings.toLocaleString("tr-TR")}`, suffix: "", icon: "M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" },
+          { label: "Deposit", value: `₺${totalDeposits.toLocaleString("tr-TR")}`, suffix: "", icon: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" },
+          { label: "Cekim", value: `₺${totalWithdrawals.toLocaleString("tr-TR")}`, suffix: "", icon: "M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" },
+          { label: "Komisyon", value: `₺${totalEarnings.toLocaleString("tr-TR")}`, suffix: "", icon: "M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" },
         ].map((card) => (
           <div key={card.label} className="bg-card border border-border rounded-xl p-4 flex items-center gap-4">
             <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
@@ -383,6 +481,14 @@ export default function PartnersPage() {
                             Bilet
                           </button>
                         )}
+                        {isSuperAdmin && (
+                          <button
+                            onClick={() => { setDeleteTarget(partner); setDeleteError("") }}
+                            className="text-xs text-muted-foreground hover:text-destructive transition-colors font-medium"
+                          >
+                            Sil
+                          </button>
+                        )}
                         <button
                           onClick={() => handleImpersonate(partner)}
                           disabled={impersonating === partner.username}
@@ -485,6 +591,64 @@ export default function PartnersPage() {
                   <p className="text-sm font-semibold text-foreground mt-0.5 font-mono truncate">{item.value}</p>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirm Modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => !deleteLoading && setDeleteTarget(null)}>
+          <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-sm shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 rounded-full bg-destructive/10 border border-destructive/20 flex items-center justify-center flex-shrink-0">
+                <svg className="w-5 h-5 text-destructive" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+              </div>
+              <div>
+                <h3 className="font-semibold text-foreground">Partneri Sil</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">Bu islem geri alinamaz</p>
+              </div>
+            </div>
+
+            <div className="bg-destructive/5 border border-destructive/10 rounded-xl px-4 py-3 mb-5">
+              <p className="text-sm text-foreground">
+                <span className="font-semibold text-destructive">{deleteTarget.name || deleteTarget.username}</span> adli partner silinecek.
+              </p>
+              <p className="text-xs text-muted-foreground mt-1 font-mono">@{deleteTarget.username} — Ref: {deleteTarget.refCode || "—"}</p>
+            </div>
+
+            {deleteError && (
+              <p className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2 mb-4">{deleteError}</p>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={handleDelete}
+                disabled={deleteLoading}
+                className="flex-1 flex items-center justify-center gap-2 bg-destructive text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-destructive/90 transition-colors disabled:opacity-60"
+              >
+                {deleteLoading ? (
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                  </svg>
+                )}
+                Evet, Sil
+              </button>
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                disabled={deleteLoading}
+                className="px-4 py-2.5 rounded-lg text-sm font-medium border border-border text-muted-foreground hover:bg-secondary transition-colors disabled:opacity-50"
+              >
+                Iptal
+              </button>
             </div>
           </div>
         </div>

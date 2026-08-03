@@ -62,11 +62,35 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    // Ay başı/sonu (bu ay)
+    // Period filtresi: today | week | month | all | custom
+    const { searchParams } = new URL(req.url)
+    const period = searchParams.get("period") || "month"
+    const customStart = searchParams.get("start")
+    const customEnd = searchParams.get("end")
+
     const now = new Date()
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1)
-    monthEnd.setMilliseconds(-1)
+    let dateRange: { $gte: Date; $lte: Date } | null = null
+
+    if (period === "today") {
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
+      dateRange = { $gte: start, $lte: end }
+    } else if (period === "week") {
+      const dayOfWeek = now.getDay() === 0 ? 6 : now.getDay() - 1 // Mon=0
+      const start = new Date(now); start.setHours(0,0,0,0); start.setDate(now.getDate() - dayOfWeek)
+      const end = new Date(start); end.setDate(start.getDate() + 6); end.setHours(23,59,59,999)
+      dateRange = { $gte: start, $lte: end }
+    } else if (period === "month") {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1)
+      const end = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+      end.setMilliseconds(-1)
+      dateRange = { $gte: start, $lte: end }
+    } else if (period === "custom" && customStart && customEnd) {
+      const start = new Date(customStart); start.setHours(0,0,0,0)
+      const end = new Date(customEnd); end.setHours(23,59,59,999)
+      dateRange = { $gte: start, $lte: end }
+    }
+    // period === "all" → dateRange kalır null
 
     // Bulk: fetch ALL users with any affiliates data once to avoid N+1 queries
     // Also gather all redeemedCodes so we can cross-reference unmatched Neon codes
@@ -147,45 +171,46 @@ export async function GET(req: NextRequest) {
           providerName: { $not: { $regex: /bonus/i } },
           providerSlug: { $not: { $regex: /bonus/i } },
         }
+        const dateFilter = dateRange ? { createdAt: dateRange } : {}
         const [forcelabDepAgg, forcelabWitAgg, meeldevDepAgg, meeldevWitAgg, fluxDepAgg, fluxWitAgg, xpayDepAgg, xpayWitAgg] = await Promise.all([
           // Forcelab deposits
           financeTx.aggregate([
-            { $match: { user: { $in: userIds }, providerType: "deposit", status: { $in: approvedStatuses }, createdAt: { $gte: monthStart, $lte: monthEnd }, ...notBonusFilter } },
+            { $match: { user: { $in: userIds }, providerType: "deposit", status: { $in: approvedStatuses }, ...dateFilter, ...notBonusFilter } },
             { $group: { _id: null, total: { $sum: "$amount" } } },
           ]).toArray(),
           // Forcelab withdrawals
           financeTx.aggregate([
-            { $match: { user: { $in: userIds }, providerType: { $in: ["withdraw", "withdrawal"] }, status: { $in: approvedStatuses }, createdAt: { $gte: monthStart, $lte: monthEnd } } },
+            { $match: { user: { $in: userIds }, providerType: { $in: ["withdraw", "withdrawal"] }, status: { $in: approvedStatuses }, ...dateFilter } },
             { $group: { _id: null, total: { $sum: "$amount" } } },
           ]).toArray(),
           // Meeldev/Capora deposits
           meeldevTx.aggregate([
-            { $match: { user: { $in: userIds }, type: "deposit", status: { $in: approvedStatuses }, createdAt: { $gte: monthStart, $lte: monthEnd }, ...notBonusFilter } },
+            { $match: { user: { $in: userIds }, type: "deposit", status: { $in: approvedStatuses }, ...dateFilter, ...notBonusFilter } },
             { $group: { _id: null, total: { $sum: "$amount" } } },
           ]).toArray(),
           // Meeldev/Capora withdrawals
           meeldevTx.aggregate([
-            { $match: { user: { $in: userIds }, type: { $in: ["withdraw", "withdrawal"] }, status: { $in: approvedStatuses }, createdAt: { $gte: monthStart, $lte: monthEnd } } },
+            { $match: { user: { $in: userIds }, type: { $in: ["withdraw", "withdrawal"] }, status: { $in: approvedStatuses }, ...dateFilter } },
             { $group: { _id: null, total: { $sum: "$amount" } } },
           ]).toArray(),
           // FluxKripto deposits
           fluxTx.aggregate([
-            { $match: { user: { $in: userIds }, type: "deposit", status: { $in: approvedStatuses }, createdAt: { $gte: monthStart, $lte: monthEnd } } },
+            { $match: { user: { $in: userIds }, type: "deposit", status: { $in: approvedStatuses }, ...dateFilter } },
             { $group: { _id: null, total: { $sum: "$amount" } } },
           ]).toArray(),
           // FluxKripto withdrawals
           fluxTx.aggregate([
-            { $match: { user: { $in: userIds }, type: { $in: ["withdraw", "withdrawal"] }, status: { $in: approvedStatuses }, createdAt: { $gte: monthStart, $lte: monthEnd } } },
+            { $match: { user: { $in: userIds }, type: { $in: ["withdraw", "withdrawal"] }, status: { $in: approvedStatuses }, ...dateFilter } },
             { $group: { _id: null, total: { $sum: "$amount" } } },
           ]).toArray(),
           // XPayment deposits
           xpayTx.aggregate([
-            { $match: { user: { $in: userIds }, type: "deposit", status: { $in: approvedStatuses }, createdAt: { $gte: monthStart, $lte: monthEnd } } },
+            { $match: { user: { $in: userIds }, type: "deposit", status: { $in: approvedStatuses }, ...dateFilter } },
             { $group: { _id: null, total: { $sum: "$amount" } } },
           ]).toArray(),
           // XPayment withdrawals
           xpayTx.aggregate([
-            { $match: { user: { $in: userIds }, type: { $in: ["withdraw", "withdrawal"] }, status: { $in: approvedStatuses }, createdAt: { $gte: monthStart, $lte: monthEnd } } },
+            { $match: { user: { $in: userIds }, type: { $in: ["withdraw", "withdrawal"] }, status: { $in: approvedStatuses }, ...dateFilter } },
             { $group: { _id: null, total: { $sum: "$amount" } } },
           ]).toArray(),
         ])
