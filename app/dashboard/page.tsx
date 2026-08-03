@@ -16,6 +16,12 @@ interface AffiliateStats {
   totalEarnings?: number
   pendingEarnings?: number
   code?: string
+  depositBreakdown?: {
+    forcelab: number
+    meeldev: number
+    filux: number
+    xpayment: number
+  }
 }
 
 interface LastFiveUser {
@@ -143,15 +149,7 @@ export default function DashboardPage() {
         if (typeof parsed.commissionRate === "number") setCommissionRate(parsed.commissionRate)
         if (parsed.commissionType) setCommissionType(parsed.commissionType)
         if (code) setRefLink(`https://bizzocazino.com/register?a=${code}`)
-        // If no refCode and not admin/superadmin, force re-login
-        if (!code && r !== "admin" && r !== "superadmin") {
-          localStorage.removeItem("affiliate_token")
-          localStorage.removeItem("affiliate_user")
-          if (typeof window !== "undefined") {
-            window.location.href = "/?reason=session_refresh"
-          }
-          return
-        }
+        // Partner rolünde refCode yoksa bile fetchData çağır — API MongoDB'den çözer
         fetchData(id, t, code, r)
       } catch {
         setLoading(false)
@@ -165,7 +163,12 @@ export default function DashboardPage() {
     const isAdmin = (r || role) === "admin" || (r || role) === "superadmin"
     setLoading(true)
     try {
-      if (!isAdmin && !id && !code) { setLoading(false); return }
+      if (!isAdmin && !id && !code) {
+        // Son çare: kullanıcı adı ile de dene
+        const storedUser = localStorage.getItem("affiliate_user")
+        const username = storedUser ? JSON.parse(storedUser)?.username : null
+        if (!username) { setLoading(false); return }
+      }
 
       // Superadmin with no code: send id only, API will aggregate all partners
       const param = code ? `refCode=${encodeURIComponent(code)}` : `id=${id}`
@@ -190,6 +193,7 @@ export default function DashboardPage() {
           totalEarnings: s.totalEarnings ?? 0,
           pendingEarnings: s.pendingEarnings ?? 0,
           code,
+          depositBreakdown: s.depositBreakdown ?? undefined,
         })
         if (s.commissionRate) setCommissionRate(s.commissionRate)
         setRefCode(code)
@@ -380,6 +384,34 @@ export default function DashboardPage() {
           }
         />
       </div>
+
+      {/* Deposit Yöntemi Dağılımı */}
+      {stats?.depositBreakdown && (
+        <div className="flex flex-col gap-2">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Bu Ay — Ödeme Yöntemi Dağılımı</p>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {[
+              { label: "Forcelab",  value: stats.depositBreakdown.forcelab,  color: "text-foreground",   border: "border-border",          dot: "bg-muted-foreground" },
+              { label: "Meeldev",   value: stats.depositBreakdown.meeldev,   color: "text-foreground",   border: "border-border",          dot: "bg-muted-foreground" },
+              { label: "Filux",     value: stats.depositBreakdown.filux,     color: "text-cyan-400",     border: "border-cyan-500/20",     dot: "bg-cyan-400" },
+              { label: "xPayment",  value: stats.depositBreakdown.xpayment,  color: "text-violet-400",   border: "border-violet-500/20",   dot: "bg-violet-400" },
+            ].map(item => (
+              <div key={item.label} className={`bg-card border ${item.border} rounded-xl p-4`}>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${item.dot}`}/>
+                  <p className="text-xs text-muted-foreground font-medium">{item.label}</p>
+                </div>
+                <p className={`text-lg font-bold ${item.color}`}>
+                  ₺{item.value.toLocaleString("tr-TR", { maximumFractionDigits: 0 })}
+                </p>
+                <p className="text-[11px] text-muted-foreground/60 mt-0.5">
+                  {stats.totalDeposits ? Math.round((item.value / stats.totalDeposits) * 100) : 0}% toplam
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 bg-card border border-border rounded-xl p-4">
