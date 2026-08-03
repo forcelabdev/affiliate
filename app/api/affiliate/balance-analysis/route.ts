@@ -47,7 +47,27 @@ export async function GET(req: NextRequest) {
       .sort({ createdAt: -1 })
       .toArray()
 
-    // 2. campaigntransactions — kampanya bonusları
+    // 2. Filux (fluxkriptotransactions) ve xPayment (xpaymenttransactions) deposit toplamları
+    const approvedStatuses = ["approved", "completed", "success", "confirmed"]
+    const fluxDepositQuery: Record<string, unknown> = { type: "deposit", status: { $in: approvedStatuses } }
+    const xpayDepositQuery: Record<string, unknown> = { type: "deposit", status: { $in: approvedStatuses } }
+    if (hasDate) { fluxDepositQuery.createdAt = dateRange; xpayDepositQuery.createdAt = dateRange }
+
+    const [fluxDocs, xpayDocs] = await Promise.all([
+      db.collection("fluxkriptotransactions")
+        .find(fluxDepositQuery, { projection: { amount: 1 } })
+        .toArray(),
+      db.collection("xpaymenttransactions")
+        .find(xpayDepositQuery, { projection: { amount: 1 } })
+        .toArray(),
+    ])
+
+    const totalFiluxAmount  = fluxDocs.reduce((s: number, d: any) => s + Number(d.amount ?? 0), 0)
+    const totalFiluxCount   = fluxDocs.length
+    const totalXpayAmount   = xpayDocs.reduce((s: number, d: any) => s + Number(d.amount ?? 0), 0)
+    const totalXpayCount    = xpayDocs.length
+
+    // 3. campaigntransactions — kampanya bonusları
     const campQuery: Record<string, unknown> = { status: "completed" }
     if (hasDate) campQuery.createdAt = dateRange
 
@@ -259,6 +279,11 @@ export async function GET(req: NextRequest) {
       totalBonusKindCount,
       totalBalanceKindAmount,
       totalBalanceKindCount,
+      // ödeme yöntemi deposit totalleri
+      totalFiluxAmount,
+      totalFiluxCount,
+      totalXpayAmount,
+      totalXpayCount,
     }
 
     return NextResponse.json({

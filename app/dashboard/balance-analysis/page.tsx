@@ -53,6 +53,11 @@ interface Summary {
   totalBonusKindCount: number
   totalBalanceKindAmount: number
   totalBalanceKindCount: number
+  // ödeme yöntemi deposit totalleri
+  totalFiluxAmount: number
+  totalFiluxCount: number
+  totalXpayAmount: number
+  totalXpayCount: number
 }
 
 interface Pagination {
@@ -264,50 +269,60 @@ export default function BalanceAnalysisPage() {
 
       {/* Summary cards */}
       {summary && (
-        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
-          {/* Toplam Yüklenen */}
-          <div className="bg-card border border-border rounded-2xl p-4 col-span-2 md:col-span-2 xl:col-span-2">
-            <p className="text-xs text-muted-foreground mb-1">Toplam Yüklenen</p>
-            <p className="text-xl font-bold text-primary">₺{fmt(summary.totalBalance)}</p>
+        <div className="flex flex-col gap-3">
+          {/* Satır 1: Toplam + Manuel ayrımı */}
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
+            {/* Toplam Yüklenen — büyük kart */}
+            <div className="bg-card border border-border rounded-2xl p-4 col-span-2 md:col-span-1 xl:col-span-1">
+              <p className="text-xs text-muted-foreground mb-1">Toplam Yüklenen</p>
+              <p className="text-xl font-bold text-primary">₺{fmt(summary.totalBalance)}</p>
+              <p className="text-[11px] text-muted-foreground/50 mt-1">{summary.totalUsers.toLocaleString("tr-TR")} üye</p>
+            </div>
+
+            {/* Eklenen Bonus (kind=bonus) */}
+            <div className="bg-card border border-amber-500/20 rounded-2xl p-4">
+              <p className="text-xs text-muted-foreground mb-1">Manuel Eklenen Bonus</p>
+              <p className="text-xl font-bold text-amber-500">₺{fmt(summary.totalBonusKindAmount)}</p>
+              <p className="text-[11px] text-amber-500/60 mt-1">{summary.totalBonusKindCount} işlem</p>
+            </div>
+
+            {/* Eklenen Bakiye (kind=balance) */}
+            <div className="bg-card border border-emerald-500/20 rounded-2xl p-4">
+              <p className="text-xs text-muted-foreground mb-1">Manuel Eklenen Bakiye</p>
+              <p className="text-xl font-bold text-emerald-500">₺{fmt(summary.totalBalanceKindAmount)}</p>
+              <p className="text-[11px] text-emerald-500/60 mt-1">{summary.totalBalanceKindCount} işlem</p>
+            </div>
+
+            {/* Filux Deposit */}
+            <div className="bg-card border border-cyan-500/20 rounded-2xl p-4">
+              <p className="text-xs text-muted-foreground mb-1">Filux Eklenen Bakiye</p>
+              <p className="text-xl font-bold text-cyan-400">₺{fmt(summary.totalFiluxAmount)}</p>
+              <p className="text-[11px] text-cyan-400/60 mt-1">{summary.totalFiluxCount} işlem</p>
+            </div>
+
+            {/* xPayment Deposit */}
+            <div className="bg-card border border-violet-500/20 rounded-2xl p-4">
+              <p className="text-xs text-muted-foreground mb-1">xPayment Eklenen Bakiye</p>
+              <p className="text-xl font-bold text-violet-400">₺{fmt(summary.totalXpayAmount)}</p>
+              <p className="text-[11px] text-violet-400/60 mt-1">{summary.totalXpayCount} işlem</p>
+            </div>
           </div>
 
-          {/* Eklenen Bonus (kind=bonus) */}
-          <div className="bg-card border border-amber-500/20 rounded-2xl p-4">
-            <p className="text-xs text-muted-foreground mb-1">Eklenen Bonus</p>
-            <p className="text-xl font-bold text-amber-500">₺{fmt(summary.totalBonusKindAmount)}</p>
-            <p className="text-[11px] text-amber-500/60 mt-1">{summary.totalBonusKindCount} işlem</p>
-          </div>
-
-          {/* Eklenen Bakiye (kind=balance) */}
-          <div className="bg-card border border-emerald-500/20 rounded-2xl p-4">
-            <p className="text-xs text-muted-foreground mb-1">Eklenen Bakiye</p>
-            <p className="text-xl font-bold text-emerald-500">₺{fmt(summary.totalBalanceKindAmount)}</p>
-            <p className="text-[11px] text-emerald-500/60 mt-1">{summary.totalBalanceKindCount} işlem</p>
-          </div>
-
-          {/* Kampanya Bonusu */}
-          <div className="bg-card border border-blue-500/20 rounded-2xl p-4">
-            <p className="text-xs text-muted-foreground mb-1">Kampanya Bonusu</p>
-            <p className="text-xl font-bold text-blue-500">₺{fmt(summary.totalCampaign)}</p>
-            <p className="text-[11px] text-blue-500/60 mt-1">{summary.totalCampaignCount} işlem</p>
-          </div>
-
-          {/* Etkilenen Üye */}
-          <div className="bg-card border border-border rounded-2xl p-4">
-            <p className="text-xs text-muted-foreground mb-1">Etkilenen Üye</p>
-            <p className="text-xl font-bold text-foreground">{summary.totalUsers.toLocaleString("tr-TR")}</p>
-          </div>
-
-          {/* Manuel İşlem (tüm bonus logları) */}
-          <div className="bg-card border border-border rounded-2xl p-4">
-            <p className="text-xs text-muted-foreground mb-1">Manuel İşlem</p>
-            <p className="text-xl font-bold text-foreground">{summary.totalBonusCount.toLocaleString("tr-TR")}</p>
-          </div>
-
-          {/* Kampanya İşlem */}
-          <div className="bg-card border border-border rounded-2xl p-4">
-            <p className="text-xs text-muted-foreground mb-1">Kampanya İşlem</p>
-            <p className="text-xl font-bold text-foreground">{summary.totalCampaignCount.toLocaleString("tr-TR")}</p>
+          {/* Satır 2: Kampanya + sayaçlar */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <div className="bg-card border border-blue-500/20 rounded-2xl p-4">
+              <p className="text-xs text-muted-foreground mb-1">Kampanya Bonusu</p>
+              <p className="text-xl font-bold text-blue-500">₺{fmt(summary.totalCampaign)}</p>
+              <p className="text-[11px] text-blue-500/60 mt-1">{summary.totalCampaignCount} işlem</p>
+            </div>
+            <div className="bg-card border border-border rounded-2xl p-4">
+              <p className="text-xs text-muted-foreground mb-1">Manuel İşlem (Toplam)</p>
+              <p className="text-xl font-bold text-foreground">{summary.totalBonusCount.toLocaleString("tr-TR")}</p>
+            </div>
+            <div className="bg-card border border-border rounded-2xl p-4">
+              <p className="text-xs text-muted-foreground mb-1">Kampanya İşlem</p>
+              <p className="text-xl font-bold text-foreground">{summary.totalCampaignCount.toLocaleString("tr-TR")}</p>
+            </div>
           </div>
         </div>
       )}
