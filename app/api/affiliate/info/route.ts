@@ -13,7 +13,21 @@ export async function GET(req: NextRequest) {
   const requestedCode = searchParams.get("refCode")
   const isAdmin = session.role === "admin" || session.role === "superadmin"
   const isAdminAll = isAdmin && !requestedCode && !session.refCode
-  const refCode = isAdmin ? requestedCode || session.refCode || null : session.refCode
+  let refCode = isAdmin ? requestedCode || session.refCode || null : session.refCode
+
+  // Partner kendi kodunu göremiyorsa MongoDB'den çek
+  if (!refCode && !isAdminAll && session.username) {
+    try {
+      await connectDB()
+      const usersColTemp = mongoose.connection.db!.collection("users")
+      const partnerDoc = await usersColTemp.findOne(
+        { username: session.username },
+        { projection: { "affiliates.code": 1 } }
+      )
+      if (partnerDoc?.affiliates?.code) refCode = partnerDoc.affiliates.code
+    } catch (_) {}
+  }
+
   if (!refCode && !isAdminAll) return NextResponse.json({ success: false, message: "Ref kodu bulunamadı." }, { status: 400 })
 
   try {
@@ -94,15 +108,7 @@ export async function GET(req: NextRequest) {
     const totalReferrals = referralUsers.length
     const userIds = referralUsers.map((u: any) => u._id)
 
-    // Current month range (Türkiye saati ile — same as referrals)
-    const trDate = new Date()
-    const offset = trDate.getTimezoneOffset()
-    const trNow = new Date(trDate.getTime() - offset * 60 * 1000)
-    const monthStart = new Date(trNow.getFullYear(), trNow.getMonth(), 1)
-    const monthEnd = new Date(trNow.getFullYear(), trNow.getMonth() + 1, 1)
-    monthEnd.setMilliseconds(-1)
-
-    // Total approved deposits this month from all payment collections (bonus hariç)
+    // Total approved deposits (tüm zamanlar) from all payment collections (bonus hariç)
     const financeTx = mongoose.connection.db!.collection("forcelabfinancetransactions")
     const meeldevTx = mongoose.connection.db!.collection("meeldevtransactions")
     const fluxTx    = mongoose.connection.db!.collection("fluxkriptotransactions")
@@ -110,6 +116,7 @@ export async function GET(req: NextRequest) {
     const approvedStatuses = ["approved", "completed", "success", "confirmed"]
 
     let totalDeposits = 0
+    let depositBreakdown = { forcelab: 0, meeldev: 0, filux: 0, xpayment: 0 }
     if (userIds.length > 0) {
       const [forcelabAgg, meeldevAgg, fluxAgg, xpayAgg] = await Promise.all([
         financeTx.aggregate([
@@ -118,7 +125,6 @@ export async function GET(req: NextRequest) {
               user: { $in: userIds },
               providerType: "deposit",
               status: { $in: approvedStatuses },
-              createdAt: { $gte: monthStart, $lte: monthEnd },
               providerName: { $not: { $regex: /bonus/i } },
               providerSlug: { $not: { $regex: /bonus/i } },
             },
@@ -131,7 +137,6 @@ export async function GET(req: NextRequest) {
               user: { $in: userIds },
               type: "deposit",
               status: { $in: approvedStatuses },
-              createdAt: { $gte: monthStart, $lte: monthEnd },
               providerName: { $not: { $regex: /bonus/i } },
               providerSlug: { $not: { $regex: /bonus/i } },
             },
@@ -144,7 +149,6 @@ export async function GET(req: NextRequest) {
               user: { $in: userIds },
               type: "deposit",
               status: { $in: approvedStatuses },
-              createdAt: { $gte: monthStart, $lte: monthEnd },
             },
           },
           { $group: { _id: null, total: { $sum: "$amount" } } },
@@ -155,14 +159,17 @@ export async function GET(req: NextRequest) {
               user: { $in: userIds },
               type: "deposit",
               status: { $in: approvedStatuses },
-              createdAt: { $gte: monthStart, $lte: monthEnd },
             },
           },
           { $group: { _id: null, total: { $sum: "$amount" } } },
         ]).toArray(),
       ])
-      totalDeposits = (forcelabAgg[0]?.total ?? 0) + (meeldevAgg[0]?.total ?? 0)
-        + (fluxAgg[0]?.total ?? 0) + (xpayAgg[0]?.total ?? 0)
+      const forcelabTotal = forcelabAgg[0]?.total ?? 0
+      const meeldevTotal  = meeldevAgg[0]?.total ?? 0
+      const fluxTotal     = fluxAgg[0]?.total ?? 0
+      const xpayTotal     = xpayAgg[0]?.total ?? 0
+      totalDeposits = forcelabTotal + meeldevTotal + fluxTotal + xpayTotal
+      depositBreakdown = { forcelab: forcelabTotal, meeldev: meeldevTotal, filux: fluxTotal, xpayment: xpayTotal }
     }
 
     // Commission = partner's rate or default 10%
@@ -180,6 +187,7 @@ export async function GET(req: NextRequest) {
         totalEarnings: commission,
         pendingEarnings: commission,
         commissionRate,
+        depositBreakdown,
       },
     })
   } catch (err) {
