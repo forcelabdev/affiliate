@@ -48,6 +48,11 @@ interface Summary {
   totalUsers: number
   totalBonusCount: number
   totalCampaignCount: number
+  // kind breakdown
+  totalBonusKindAmount: number
+  totalBonusKindCount: number
+  totalBalanceKindAmount: number
+  totalBalanceKindCount: number
 }
 
 interface Pagination {
@@ -259,20 +264,51 @@ export default function BalanceAnalysisPage() {
 
       {/* Summary cards */}
       {summary && (
-        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
-          {[
-            { label: "Toplam Yüklenen",    value: `₺${fmt(summary.totalBalance)}`,       color: "text-primary" },
-            { label: "Manuel Bonus",        value: `₺${fmt(summary.totalBonus)}`,          color: "text-amber-500" },
-            { label: "Kampanya Bonusu",     value: `₺${fmt(summary.totalCampaign)}`,       color: "text-blue-500" },
-            { label: "Etkilenen Üye",       value: summary.totalUsers.toLocaleString("tr-TR"),             color: "text-foreground" },
-            { label: "Manuel İşlem",        value: summary.totalBonusCount.toLocaleString("tr-TR"),        color: "text-foreground" },
-            { label: "Kampanya İşlem",      value: summary.totalCampaignCount.toLocaleString("tr-TR"),     color: "text-foreground" },
-          ].map(card => (
-            <div key={card.label} className="bg-card border border-border rounded-2xl p-4">
-              <p className="text-xs text-muted-foreground mb-1">{card.label}</p>
-              <p className={`text-xl font-bold ${card.color}`}>{card.value}</p>
-            </div>
-          ))}
+        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
+          {/* Toplam Yüklenen */}
+          <div className="bg-card border border-border rounded-2xl p-4 col-span-2 md:col-span-2 xl:col-span-2">
+            <p className="text-xs text-muted-foreground mb-1">Toplam Yüklenen</p>
+            <p className="text-xl font-bold text-primary">₺{fmt(summary.totalBalance)}</p>
+          </div>
+
+          {/* Eklenen Bonus (kind=bonus) */}
+          <div className="bg-card border border-amber-500/20 rounded-2xl p-4">
+            <p className="text-xs text-muted-foreground mb-1">Eklenen Bonus</p>
+            <p className="text-xl font-bold text-amber-500">₺{fmt(summary.totalBonusKindAmount)}</p>
+            <p className="text-[11px] text-amber-500/60 mt-1">{summary.totalBonusKindCount} işlem</p>
+          </div>
+
+          {/* Eklenen Bakiye (kind=balance) */}
+          <div className="bg-card border border-emerald-500/20 rounded-2xl p-4">
+            <p className="text-xs text-muted-foreground mb-1">Eklenen Bakiye</p>
+            <p className="text-xl font-bold text-emerald-500">₺{fmt(summary.totalBalanceKindAmount)}</p>
+            <p className="text-[11px] text-emerald-500/60 mt-1">{summary.totalBalanceKindCount} işlem</p>
+          </div>
+
+          {/* Kampanya Bonusu */}
+          <div className="bg-card border border-blue-500/20 rounded-2xl p-4">
+            <p className="text-xs text-muted-foreground mb-1">Kampanya Bonusu</p>
+            <p className="text-xl font-bold text-blue-500">₺{fmt(summary.totalCampaign)}</p>
+            <p className="text-[11px] text-blue-500/60 mt-1">{summary.totalCampaignCount} işlem</p>
+          </div>
+
+          {/* Etkilenen Üye */}
+          <div className="bg-card border border-border rounded-2xl p-4">
+            <p className="text-xs text-muted-foreground mb-1">Etkilenen Üye</p>
+            <p className="text-xl font-bold text-foreground">{summary.totalUsers.toLocaleString("tr-TR")}</p>
+          </div>
+
+          {/* Manuel İşlem (tüm bonus logları) */}
+          <div className="bg-card border border-border rounded-2xl p-4">
+            <p className="text-xs text-muted-foreground mb-1">Manuel İşlem</p>
+            <p className="text-xl font-bold text-foreground">{summary.totalBonusCount.toLocaleString("tr-TR")}</p>
+          </div>
+
+          {/* Kampanya İşlem */}
+          <div className="bg-card border border-border rounded-2xl p-4">
+            <p className="text-xs text-muted-foreground mb-1">Kampanya İşlem</p>
+            <p className="text-xl font-bold text-foreground">{summary.totalCampaignCount.toLocaleString("tr-TR")}</p>
+          </div>
         </div>
       )}
 

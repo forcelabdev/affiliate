@@ -229,13 +229,36 @@ export async function GET(req: NextRequest) {
     const paginated  = allUsers.slice(skip, skip + limit)
 
     // 8. Global summary
+    // Bonus kind breakdown: "bonus" vs "balance" (from adminmanualadjustments.kind)
+    let totalBonusKindAmount  = 0
+    let totalBonusKindCount   = 0
+    let totalBalanceKindAmount = 0
+    let totalBalanceKindCount  = 0
+
+    for (const u of allUsers) {
+      for (const log of u.bonusLogs) {
+        if (log.type === "bonus") {
+          totalBonusKindAmount += log.amount
+          totalBonusKindCount  += 1
+        } else if (log.type === "balance") {
+          totalBalanceKindAmount += log.amount
+          totalBalanceKindCount  += 1
+        }
+      }
+    }
+
     const summary = {
-      totalBonus:        allUsers.reduce((s, u) => s + u.totalBonus, 0),
-      totalCampaign:     allUsers.reduce((s, u) => s + u.totalCampaign, 0),
-      totalBalance:      allUsers.reduce((s, u) => s + u.totalBalance, 0),
-      totalUsers:        totalCount,
-      totalBonusCount:   allUsers.reduce((s, u) => s + u.bonusCount, 0),
-      totalCampaignCount:allUsers.reduce((s, u) => s + u.campaignCount, 0),
+      totalBonus:           allUsers.reduce((s, u) => s + u.totalBonus, 0),
+      totalCampaign:        allUsers.reduce((s, u) => s + u.totalCampaign, 0),
+      totalBalance:         allUsers.reduce((s, u) => s + u.totalBalance, 0),
+      totalUsers:           totalCount,
+      totalBonusCount:      allUsers.reduce((s, u) => s + u.bonusCount, 0),
+      totalCampaignCount:   allUsers.reduce((s, u) => s + u.campaignCount, 0),
+      // kind breakdown
+      totalBonusKindAmount,
+      totalBonusKindCount,
+      totalBalanceKindAmount,
+      totalBalanceKindCount,
     }
 
     return NextResponse.json({
