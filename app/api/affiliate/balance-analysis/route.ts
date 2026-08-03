@@ -55,10 +55,12 @@ export async function GET(req: NextRequest) {
 
     const [fluxDocs, xpayDocs] = await Promise.all([
       db.collection("fluxkriptotransactions")
-        .find(fluxDepositQuery, { projection: { amount: 1 } })
+        .find(fluxDepositQuery, { projection: { userId: 1, user: 1, amount: 1, status: 1, createdAt: 1 } })
+        .sort({ createdAt: -1 })
         .toArray(),
       db.collection("xpaymenttransactions")
-        .find(xpayDepositQuery, { projection: { amount: 1 } })
+        .find(xpayDepositQuery, { projection: { userId: 1, user: 1, amount: 1, status: 1, createdAt: 1 } })
+        .sort({ createdAt: -1 })
         .toArray(),
     ])
 
@@ -134,6 +136,13 @@ export async function GET(req: NextRequest) {
     })
 
     // 5. Her kullanıcı için özet oluştur
+    interface DepositLog {
+      id: string
+      amount: number
+      status: string | null
+      createdAt: string
+    }
+
     interface UserBalance {
       userId: string
       username: string
@@ -164,6 +173,8 @@ export async function GET(req: NextRequest) {
         mode: string | null
         createdAt: string
       }[]
+      filuxLogs: DepositLog[]
+      xpayLogs: DepositLog[]
     }
 
     const userBalMap: Record<string, UserBalance> = {}
@@ -186,6 +197,8 @@ export async function GET(req: NextRequest) {
           campaignCount: 0,
           bonusLogs:     [],
           campaignLogs:  [],
+          filuxLogs:     [],
+          xpayLogs:      [],
         }
       }
       return userBalMap[uid]
@@ -228,6 +241,34 @@ export async function GET(req: NextRequest) {
         mode:      c.mode ?? null,
         createdAt: c.createdAt instanceof Date ? c.createdAt.toISOString() : String(c.createdAt ?? ""),
       })
+    }
+
+    // Filux logs — kullanıcı bazında eşleştir (userId veya user alanı)
+    for (const d of fluxDocs) {
+      const uid = String(d.userId ?? d.user ?? "")
+      if (!uid) continue
+      if (userBalMap[uid]) {
+        userBalMap[uid].filuxLogs.push({
+          id:        String(d._id),
+          amount:    Number(d.amount ?? 0),
+          status:    d.status ?? null,
+          createdAt: d.createdAt instanceof Date ? d.createdAt.toISOString() : String(d.createdAt ?? ""),
+        })
+      }
+    }
+
+    // xPayment logs
+    for (const d of xpayDocs) {
+      const uid = String(d.userId ?? d.user ?? "")
+      if (!uid) continue
+      if (userBalMap[uid]) {
+        userBalMap[uid].xpayLogs.push({
+          id:        String(d._id),
+          amount:    Number(d.amount ?? 0),
+          status:    d.status ?? null,
+          createdAt: d.createdAt instanceof Date ? d.createdAt.toISOString() : String(d.createdAt ?? ""),
+        })
+      }
     }
 
     // 6. Filter out users that couldn't be resolved in MongoDB (username would be null/ObjectId)

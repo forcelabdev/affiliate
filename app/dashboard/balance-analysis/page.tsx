@@ -26,6 +26,13 @@ interface CampaignLog {
   createdAt: string
 }
 
+interface DepositLog {
+  id: string
+  amount: number
+  status: string | null
+  createdAt: string
+}
+
 interface UserBalance {
   userId: string
   username: string
@@ -39,6 +46,8 @@ interface UserBalance {
   campaignCount: number
   bonusLogs: BonusLog[]
   campaignLogs: CampaignLog[]
+  filuxLogs: DepositLog[]
+  xpayLogs: DepositLog[]
 }
 
 interface Summary {
@@ -153,7 +162,7 @@ export default function BalanceAnalysisPage() {
 
   // Expanded rows
   const [expandedUsers, setExpanded] = useState<Record<string, boolean>>({})
-  const [activeTab, setActiveTab]    = useState<Record<string, "bonus" | "campaign">>({})
+  const [activeTab, setActiveTab]    = useState<Record<string, "manuelBonus" | "manuelBalance" | "filux" | "xpay" | "campaign">>({})
 
   // Fetch
   const fetchData = useCallback(async (p = 1) => {
@@ -199,8 +208,8 @@ export default function BalanceAnalysisPage() {
     setExpanded(prev => ({ ...prev, [uid]: !prev[uid] }))
   }
 
-  function getTab(uid: string): "bonus" | "campaign" {
-    return activeTab[uid] ?? "bonus"
+  function getTab(uid: string): "manuelBonus" | "manuelBalance" | "filux" | "xpay" | "campaign" {
+    return activeTab[uid] ?? "manuelBonus"
   }
 
   if (!token) return null
@@ -439,145 +448,256 @@ export default function BalanceAnalysisPage() {
                       </tr>
 
                       {/* Expanded detail */}
-                      {isOpen && (
-                        <tr>
-                          <td colSpan={8} className="bg-secondary/10 border-b border-border px-4 py-4">
-                            {/* Tabs */}
-                            <div className="flex items-center gap-2 mb-4">
-                              <button
-                                onClick={() => setActiveTab(prev => ({ ...prev, [u.userId]: "bonus" }))}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors border ${
-                                  tab === "bonus"
-                                    ? "bg-amber-500/10 text-amber-500 border-amber-500/30"
-                                    : "border-border text-muted-foreground hover:bg-secondary"
-                                }`}
-                              >
-                                Manuel Bonus ({u.bonusCount})
-                              </button>
-                              <button
-                                onClick={() => setActiveTab(prev => ({ ...prev, [u.userId]: "campaign" }))}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors border ${
-                                  tab === "campaign"
-                                    ? "bg-blue-500/10 text-blue-500 border-blue-500/30"
-                                    : "border-border text-muted-foreground hover:bg-secondary"
-                                }`}
-                              >
-                                Kampanya ({u.campaignCount})
-                              </button>
-                            </div>
+                      {isOpen && (() => {
+                        const manuelBonusLogs  = u.bonusLogs.filter(l => l.type === "bonus")
+                        const manuelBalanceLogs = u.bonusLogs.filter(l => l.type === "balance" || l.type === "Rivo")
+                        const filuxTotal  = (u.filuxLogs ?? []).reduce((s, l) => s + l.amount, 0)
+                        const xpayTotal   = (u.xpayLogs ?? []).reduce((s, l) => s + l.amount, 0)
+                        const manuelBonusTotal   = manuelBonusLogs.reduce((s, l) => s + l.amount, 0)
+                        const manuelBalanceTotal  = manuelBalanceLogs.reduce((s, l) => s + l.amount, 0)
 
-                            {/* Bonus logs */}
-                            {tab === "bonus" && (
-                              u.bonusLogs.length === 0 ? (
-                                <p className="text-xs text-muted-foreground py-4 text-center">Manuel bonus kaydı yok</p>
-                              ) : (
-                                <div className="overflow-x-auto rounded-xl border border-border">
-                                  <table className="w-full text-xs">
-                                    <thead className="bg-secondary/40">
-                                      <tr>
-                                        <th className="text-left px-3 py-2 font-semibold text-muted-foreground uppercase tracking-wider">Tür</th>
-                                        <th className="text-left px-3 py-2 font-semibold text-muted-foreground uppercase tracking-wider">Kategori</th>
-                                        <th className="text-left px-3 py-2 font-semibold text-muted-foreground uppercase tracking-wider hidden sm:table-cell">Not</th>
-                                        <th className="text-left px-3 py-2 font-semibold text-muted-foreground uppercase tracking-wider hidden md:table-cell">Admin</th>
-                                        <th className="text-right px-3 py-2 font-semibold text-muted-foreground uppercase tracking-wider">Miktar</th>
-                                        <th className="text-right px-3 py-2 font-semibold text-muted-foreground uppercase tracking-wider hidden lg:table-cell">Önce / Sonra</th>
-                                        <th className="text-right px-3 py-2 font-semibold text-muted-foreground uppercase tracking-wider">Tarih</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-border">
-                                      {u.bonusLogs.map(log => (
-                                        <tr key={log.id} className="hover:bg-secondary/20 transition-colors">
-                                          <td className="px-3 py-2">
-                                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border ${KIND_COLORS[log.type] ?? "bg-secondary text-foreground border-border"}`}>
-                                              {KIND_LABELS[log.type] ?? log.type}
-                                            </span>
-                                          </td>
-                                          <td className="px-3 py-2 text-muted-foreground">
-                                            {log.category ?? "—"}
-                                          </td>
-                                          <td className="px-3 py-2 text-muted-foreground hidden sm:table-cell italic max-w-[180px] truncate">
-                                            {log.note || "—"}
-                                          </td>
-                                          <td className="px-3 py-2 text-muted-foreground hidden md:table-cell">
-                                            {log.actorUsername ?? "—"}
-                                          </td>
-                                          <td className="px-3 py-2 text-right font-mono font-bold text-amber-500">
-                                            +₺{fmt(log.amount)}
-                                          </td>
-                                          <td className="px-3 py-2 text-right text-muted-foreground hidden lg:table-cell">
-                                            <span className="font-mono">₺{fmt(log.balanceBefore)}</span>
-                                            <span className="mx-1 text-muted-foreground/50">→</span>
-                                            <span className="font-mono">₺{fmt(log.balanceAfter)}</span>
-                                          </td>
-                                          <td className="px-3 py-2 text-right text-muted-foreground whitespace-nowrap">
-                                            {fmtDate(log.createdAt)}
-                                          </td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                    <tfoot className="bg-secondary/30 border-t border-border">
-                                      <tr>
-                                        <td colSpan={4} className="px-3 py-2 font-semibold text-foreground text-xs">Toplam</td>
-                                        <td className="px-3 py-2 text-right font-bold text-amber-500 font-mono">
-                                          +₺{fmt(u.totalBonus)}
-                                        </td>
-                                        <td colSpan={2}></td>
-                                      </tr>
-                                    </tfoot>
-                                  </table>
-                                </div>
-                              )
-                            )}
+                        const TABS = [
+                          { key: "manuelBonus",   label: `Manuel Bonus`,   count: manuelBonusLogs.length,       activeClass: "bg-amber-500/10 text-amber-500 border-amber-500/30" },
+                          { key: "manuelBalance", label: `Manuel Bakiye`,  count: manuelBalanceLogs.length,      activeClass: "bg-emerald-500/10 text-emerald-500 border-emerald-500/30" },
+                          { key: "filux",         label: `Filux`,          count: (u.filuxLogs ?? []).length,   activeClass: "bg-cyan-500/10 text-cyan-400 border-cyan-500/30" },
+                          { key: "xpay",          label: `xPayment`,       count: (u.xpayLogs ?? []).length,    activeClass: "bg-violet-500/10 text-violet-400 border-violet-500/30" },
+                          { key: "campaign",      label: `Kampanya`,       count: u.campaignCount,               activeClass: "bg-blue-500/10 text-blue-500 border-blue-500/30" },
+                        ] as const
 
-                            {/* Campaign logs */}
-                            {tab === "campaign" && (
-                              u.campaignLogs.length === 0 ? (
-                                <p className="text-xs text-muted-foreground py-4 text-center">Kampanya kaydı yok</p>
-                              ) : (
-                                <div className="overflow-x-auto rounded-xl border border-border">
-                                  <table className="w-full text-xs">
-                                    <thead className="bg-secondary/40">
-                                      <tr>
-                                        <th className="text-left px-3 py-2 font-semibold text-muted-foreground uppercase tracking-wider">Kampanya</th>
-                                        <th className="text-left px-3 py-2 font-semibold text-muted-foreground uppercase tracking-wider hidden sm:table-cell">Mod</th>
-                                        <th className="text-right px-3 py-2 font-semibold text-muted-foreground uppercase tracking-wider">Miktar</th>
-                                        <th className="text-right px-3 py-2 font-semibold text-muted-foreground uppercase tracking-wider">Tarih</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-border">
-                                      {u.campaignLogs.map(log => (
-                                        <tr key={log.id} className="hover:bg-secondary/20 transition-colors">
-                                          <td className="px-3 py-2 text-foreground">
-                                            {log.title ?? "İsimsiz Kampanya"}
-                                          </td>
-                                          <td className="px-3 py-2 text-muted-foreground hidden sm:table-cell">
-                                            {log.mode === "auto" ? "Otomatik" : log.mode === "manual" ? "Manuel" : (log.mode ?? "—")}
-                                          </td>
-                                          <td className="px-3 py-2 text-right font-mono font-bold text-blue-500">
-                                            +₺{fmt(log.amount)}
-                                          </td>
-                                          <td className="px-3 py-2 text-right text-muted-foreground whitespace-nowrap">
-                                            {fmtDate(log.createdAt)}
-                                          </td>
+                        return (
+                          <tr>
+                            <td colSpan={8} className="bg-secondary/10 border-b border-border px-4 py-4">
+                              {/* Tabs */}
+                              <div className="flex items-center gap-2 mb-4 flex-wrap">
+                                {TABS.map(t => (
+                                  <button
+                                    key={t.key}
+                                    onClick={() => setActiveTab(prev => ({ ...prev, [u.userId]: t.key }))}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors border ${
+                                      tab === t.key ? t.activeClass : "border-border text-muted-foreground hover:bg-secondary"
+                                    }`}
+                                  >
+                                    {t.label} ({t.count})
+                                  </button>
+                                ))}
+                              </div>
+
+                              {/* Manuel Bonus logs */}
+                              {tab === "manuelBonus" && (
+                                manuelBonusLogs.length === 0 ? (
+                                  <p className="text-xs text-muted-foreground py-4 text-center">Manuel bonus kaydı yok</p>
+                                ) : (
+                                  <div className="overflow-x-auto rounded-xl border border-border">
+                                    <table className="w-full text-xs">
+                                      <thead className="bg-secondary/40">
+                                        <tr>
+                                          <th className="text-left px-3 py-2 font-semibold text-muted-foreground uppercase tracking-wider">Kategori</th>
+                                          <th className="text-left px-3 py-2 font-semibold text-muted-foreground uppercase tracking-wider hidden sm:table-cell">Not</th>
+                                          <th className="text-left px-3 py-2 font-semibold text-muted-foreground uppercase tracking-wider hidden md:table-cell">Admin</th>
+                                          <th className="text-right px-3 py-2 font-semibold text-muted-foreground uppercase tracking-wider">Miktar</th>
+                                          <th className="text-right px-3 py-2 font-semibold text-muted-foreground uppercase tracking-wider hidden lg:table-cell">Önce / Sonra</th>
+                                          <th className="text-right px-3 py-2 font-semibold text-muted-foreground uppercase tracking-wider">Tarih</th>
                                         </tr>
-                                      ))}
-                                    </tbody>
-                                    <tfoot className="bg-secondary/30 border-t border-border">
-                                      <tr>
-                                        <td colSpan={2} className="px-3 py-2 font-semibold text-foreground text-xs">Toplam</td>
-                                        <td className="px-3 py-2 text-right font-bold text-blue-500 font-mono">
-                                          +₺{fmt(u.totalCampaign)}
-                                        </td>
-                                        <td></td>
-                                      </tr>
-                                    </tfoot>
-                                  </table>
-                                </div>
-                              )
-                            )}
-                          </td>
-                        </tr>
-                      )}
+                                      </thead>
+                                      <tbody className="divide-y divide-border">
+                                        {manuelBonusLogs.map(log => (
+                                          <tr key={log.id} className="hover:bg-secondary/20 transition-colors">
+                                            <td className="px-3 py-2 text-muted-foreground">{log.category ?? "—"}</td>
+                                            <td className="px-3 py-2 text-muted-foreground hidden sm:table-cell italic max-w-[180px] truncate">{log.note || "—"}</td>
+                                            <td className="px-3 py-2 text-muted-foreground hidden md:table-cell">{log.actorUsername ?? "—"}</td>
+                                            <td className="px-3 py-2 text-right font-mono font-bold text-amber-500">+₺{fmt(log.amount)}</td>
+                                            <td className="px-3 py-2 text-right text-muted-foreground hidden lg:table-cell">
+                                              <span className="font-mono">₺{fmt(log.balanceBefore)}</span>
+                                              <span className="mx-1 text-muted-foreground/50">→</span>
+                                              <span className="font-mono">₺{fmt(log.balanceAfter)}</span>
+                                            </td>
+                                            <td className="px-3 py-2 text-right text-muted-foreground whitespace-nowrap">{fmtDate(log.createdAt)}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                      <tfoot className="bg-secondary/30 border-t border-border">
+                                        <tr>
+                                          <td colSpan={3} className="px-3 py-2 font-semibold text-foreground text-xs">Toplam</td>
+                                          <td className="px-3 py-2 text-right font-bold text-amber-500 font-mono">+₺{fmt(manuelBonusTotal)}</td>
+                                          <td colSpan={2}></td>
+                                        </tr>
+                                      </tfoot>
+                                    </table>
+                                  </div>
+                                )
+                              )}
+
+                              {/* Manuel Bakiye logs */}
+                              {tab === "manuelBalance" && (
+                                manuelBalanceLogs.length === 0 ? (
+                                  <p className="text-xs text-muted-foreground py-4 text-center">Manuel bakiye kaydı yok</p>
+                                ) : (
+                                  <div className="overflow-x-auto rounded-xl border border-border">
+                                    <table className="w-full text-xs">
+                                      <thead className="bg-secondary/40">
+                                        <tr>
+                                          <th className="text-left px-3 py-2 font-semibold text-muted-foreground uppercase tracking-wider">Tür</th>
+                                          <th className="text-left px-3 py-2 font-semibold text-muted-foreground uppercase tracking-wider">Kategori</th>
+                                          <th className="text-left px-3 py-2 font-semibold text-muted-foreground uppercase tracking-wider hidden sm:table-cell">Not</th>
+                                          <th className="text-left px-3 py-2 font-semibold text-muted-foreground uppercase tracking-wider hidden md:table-cell">Admin</th>
+                                          <th className="text-right px-3 py-2 font-semibold text-muted-foreground uppercase tracking-wider">Miktar</th>
+                                          <th className="text-right px-3 py-2 font-semibold text-muted-foreground uppercase tracking-wider hidden lg:table-cell">Önce / Sonra</th>
+                                          <th className="text-right px-3 py-2 font-semibold text-muted-foreground uppercase tracking-wider">Tarih</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-border">
+                                        {manuelBalanceLogs.map(log => (
+                                          <tr key={log.id} className="hover:bg-secondary/20 transition-colors">
+                                            <td className="px-3 py-2">
+                                              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border ${KIND_COLORS[log.type] ?? "bg-secondary text-foreground border-border"}`}>
+                                                {KIND_LABELS[log.type] ?? log.type}
+                                              </span>
+                                            </td>
+                                            <td className="px-3 py-2 text-muted-foreground">{log.category ?? "—"}</td>
+                                            <td className="px-3 py-2 text-muted-foreground hidden sm:table-cell italic max-w-[180px] truncate">{log.note || "—"}</td>
+                                            <td className="px-3 py-2 text-muted-foreground hidden md:table-cell">{log.actorUsername ?? "—"}</td>
+                                            <td className="px-3 py-2 text-right font-mono font-bold text-emerald-500">+₺{fmt(log.amount)}</td>
+                                            <td className="px-3 py-2 text-right text-muted-foreground hidden lg:table-cell">
+                                              <span className="font-mono">₺{fmt(log.balanceBefore)}</span>
+                                              <span className="mx-1 text-muted-foreground/50">→</span>
+                                              <span className="font-mono">₺{fmt(log.balanceAfter)}</span>
+                                            </td>
+                                            <td className="px-3 py-2 text-right text-muted-foreground whitespace-nowrap">{fmtDate(log.createdAt)}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                      <tfoot className="bg-secondary/30 border-t border-border">
+                                        <tr>
+                                          <td colSpan={4} className="px-3 py-2 font-semibold text-foreground text-xs">Toplam</td>
+                                          <td className="px-3 py-2 text-right font-bold text-emerald-500 font-mono">+₺{fmt(manuelBalanceTotal)}</td>
+                                          <td colSpan={2}></td>
+                                        </tr>
+                                      </tfoot>
+                                    </table>
+                                  </div>
+                                )
+                              )}
+
+                              {/* Filux deposit logs */}
+                              {tab === "filux" && (
+                                (u.filuxLogs ?? []).length === 0 ? (
+                                  <p className="text-xs text-muted-foreground py-4 text-center">Filux deposit kaydı yok</p>
+                                ) : (
+                                  <div className="overflow-x-auto rounded-xl border border-border">
+                                    <table className="w-full text-xs">
+                                      <thead className="bg-secondary/40">
+                                        <tr>
+                                          <th className="text-left px-3 py-2 font-semibold text-muted-foreground uppercase tracking-wider">Durum</th>
+                                          <th className="text-right px-3 py-2 font-semibold text-muted-foreground uppercase tracking-wider">Miktar</th>
+                                          <th className="text-right px-3 py-2 font-semibold text-muted-foreground uppercase tracking-wider">Tarih</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-border">
+                                        {(u.filuxLogs ?? []).map(log => (
+                                          <tr key={log.id} className="hover:bg-secondary/20 transition-colors">
+                                            <td className="px-3 py-2">
+                                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border bg-cyan-500/10 text-cyan-400 border-cyan-500/20">
+                                                {log.status ?? "—"}
+                                              </span>
+                                            </td>
+                                            <td className="px-3 py-2 text-right font-mono font-bold text-cyan-400">+₺{fmt(log.amount)}</td>
+                                            <td className="px-3 py-2 text-right text-muted-foreground whitespace-nowrap">{fmtDate(log.createdAt)}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                      <tfoot className="bg-secondary/30 border-t border-border">
+                                        <tr>
+                                          <td className="px-3 py-2 font-semibold text-foreground text-xs">Toplam</td>
+                                          <td className="px-3 py-2 text-right font-bold text-cyan-400 font-mono">+₺{fmt(filuxTotal)}</td>
+                                          <td></td>
+                                        </tr>
+                                      </tfoot>
+                                    </table>
+                                  </div>
+                                )
+                              )}
+
+                              {/* xPayment deposit logs */}
+                              {tab === "xpay" && (
+                                (u.xpayLogs ?? []).length === 0 ? (
+                                  <p className="text-xs text-muted-foreground py-4 text-center">xPayment deposit kaydı yok</p>
+                                ) : (
+                                  <div className="overflow-x-auto rounded-xl border border-border">
+                                    <table className="w-full text-xs">
+                                      <thead className="bg-secondary/40">
+                                        <tr>
+                                          <th className="text-left px-3 py-2 font-semibold text-muted-foreground uppercase tracking-wider">Durum</th>
+                                          <th className="text-right px-3 py-2 font-semibold text-muted-foreground uppercase tracking-wider">Miktar</th>
+                                          <th className="text-right px-3 py-2 font-semibold text-muted-foreground uppercase tracking-wider">Tarih</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-border">
+                                        {(u.xpayLogs ?? []).map(log => (
+                                          <tr key={log.id} className="hover:bg-secondary/20 transition-colors">
+                                            <td className="px-3 py-2">
+                                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border bg-violet-500/10 text-violet-400 border-violet-500/20">
+                                                {log.status ?? "—"}
+                                              </span>
+                                            </td>
+                                            <td className="px-3 py-2 text-right font-mono font-bold text-violet-400">+₺{fmt(log.amount)}</td>
+                                            <td className="px-3 py-2 text-right text-muted-foreground whitespace-nowrap">{fmtDate(log.createdAt)}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                      <tfoot className="bg-secondary/30 border-t border-border">
+                                        <tr>
+                                          <td className="px-3 py-2 font-semibold text-foreground text-xs">Toplam</td>
+                                          <td className="px-3 py-2 text-right font-bold text-violet-400 font-mono">+₺{fmt(xpayTotal)}</td>
+                                          <td></td>
+                                        </tr>
+                                      </tfoot>
+                                    </table>
+                                  </div>
+                                )
+                              )}
+
+                              {/* Campaign logs */}
+                              {tab === "campaign" && (
+                                u.campaignLogs.length === 0 ? (
+                                  <p className="text-xs text-muted-foreground py-4 text-center">Kampanya kaydı yok</p>
+                                ) : (
+                                  <div className="overflow-x-auto rounded-xl border border-border">
+                                    <table className="w-full text-xs">
+                                      <thead className="bg-secondary/40">
+                                        <tr>
+                                          <th className="text-left px-3 py-2 font-semibold text-muted-foreground uppercase tracking-wider">Kampanya</th>
+                                          <th className="text-left px-3 py-2 font-semibold text-muted-foreground uppercase tracking-wider hidden sm:table-cell">Mod</th>
+                                          <th className="text-right px-3 py-2 font-semibold text-muted-foreground uppercase tracking-wider">Miktar</th>
+                                          <th className="text-right px-3 py-2 font-semibold text-muted-foreground uppercase tracking-wider">Tarih</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-border">
+                                        {u.campaignLogs.map(log => (
+                                          <tr key={log.id} className="hover:bg-secondary/20 transition-colors">
+                                            <td className="px-3 py-2 text-foreground">{log.title ?? "İsimsiz Kampanya"}</td>
+                                            <td className="px-3 py-2 text-muted-foreground hidden sm:table-cell">
+                                              {log.mode === "auto" ? "Otomatik" : log.mode === "manual" ? "Manuel" : (log.mode ?? "—")}
+                                            </td>
+                                            <td className="px-3 py-2 text-right font-mono font-bold text-blue-500">+₺{fmt(log.amount)}</td>
+                                            <td className="px-3 py-2 text-right text-muted-foreground whitespace-nowrap">{fmtDate(log.createdAt)}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                      <tfoot className="bg-secondary/30 border-t border-border">
+                                        <tr>
+                                          <td colSpan={2} className="px-3 py-2 font-semibold text-foreground text-xs">Toplam</td>
+                                          <td className="px-3 py-2 text-right font-bold text-blue-500 font-mono">+₺{fmt(u.totalCampaign)}</td>
+                                          <td></td>
+                                        </tr>
+                                      </tfoot>
+                                    </table>
+                                  </div>
+                                )
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })()}
                     </React.Fragment>
                   )
                 })}
