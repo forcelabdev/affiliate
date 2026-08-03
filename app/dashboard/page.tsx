@@ -353,7 +353,7 @@ export default function DashboardPage() {
         <StatCard
           label="Toplam Deposit"
           value={`₺${(stats?.totalDeposits ?? 0).toLocaleString("tr-TR")}`}
-          sub="Bu Ay"
+          sub="Tüm Zamanlar"
           icon={
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>
@@ -363,7 +363,7 @@ export default function DashboardPage() {
         <StatCard
           label={`Komisyon (${commissionRate}%)`}
           value={`₺${(stats?.totalEarnings ?? 0).toLocaleString("tr-TR", { maximumFractionDigits: 0 })}`}
-          sub="Bu Ay"
+          sub="Tüm Zamanlar"
           accent
           icon={
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -375,7 +375,7 @@ export default function DashboardPage() {
         <StatCard
           label="Bekleyen Kazanç"
           value={`₺${(stats?.pendingEarnings ?? 0).toLocaleString("tr-TR")}`}
-          sub="Bu Ay"
+          sub="Tüm Zamanlar"
           icon={
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <circle cx="12" cy="12" r="10"/>
@@ -388,7 +388,7 @@ export default function DashboardPage() {
       {/* Deposit Yöntemi Dağılımı */}
       {stats?.depositBreakdown && (
         <div className="flex flex-col gap-2">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Bu Ay — Ödeme Yöntemi Dağılımı</p>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Ödeme Yöntemi Dağılımı — Tüm Zamanlar</p>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {[
               { label: "Forcelab",  value: stats.depositBreakdown.forcelab,  color: "text-foreground",   border: "border-border",          dot: "bg-muted-foreground" },
