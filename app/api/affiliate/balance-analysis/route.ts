@@ -48,9 +48,9 @@ export async function GET(req: NextRequest) {
       .toArray()
 
     // 2. Filux (fluxkriptotransactions) ve xPayment (xpaymenttransactions) deposit toplamları
-    const approvedStatuses = ["approved", "completed", "success", "confirmed"]
-    const fluxDepositQuery: Record<string, unknown> = { type: "deposit", status: { $in: approvedStatuses } }
-    const xpayDepositQuery: Record<string, unknown> = { type: "deposit", status: { $in: approvedStatuses } }
+    // Sadece status === "approved" olan kayıtlar alınır
+    const fluxDepositQuery: Record<string, unknown> = { type: "deposit", status: "approved" }
+    const xpayDepositQuery: Record<string, unknown> = { type: "deposit", status: "approved" }
     if (hasDate) { fluxDepositQuery.createdAt = dateRange; xpayDepositQuery.createdAt = dateRange }
 
     const [fluxDocs, xpayDocs] = await Promise.all([
