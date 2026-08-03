@@ -47,7 +47,29 @@ export async function GET(req: NextRequest) {
       .sort({ createdAt: -1 })
       .toArray()
 
-    // 2. campaigntransactions — kampanya bonusları
+    // 2. Filux (fluxkriptotransactions) ve xPayment (xpaymenttransactions) deposit toplamları
+    // Sadece status === "approved" olan kayıtlar alınır
+    const fluxDepositQuery: Record<string, unknown> = { type: "deposit", status: "approved" }
+    const xpayDepositQuery: Record<string, unknown> = { type: "deposit", status: "approved" }
+    if (hasDate) { fluxDepositQuery.createdAt = dateRange; xpayDepositQuery.createdAt = dateRange }
+
+    const [fluxDocs, xpayDocs] = await Promise.all([
+      db.collection("fluxkriptotransactions")
+        .find(fluxDepositQuery, { projection: { userId: 1, user: 1, amount: 1, status: 1, createdAt: 1 } })
+        .sort({ createdAt: -1 })
+        .toArray(),
+      db.collection("xpaymenttransactions")
+        .find(xpayDepositQuery, { projection: { userId: 1, user: 1, amount: 1, status: 1, createdAt: 1 } })
+        .sort({ createdAt: -1 })
+        .toArray(),
+    ])
+
+    const totalFiluxAmount  = fluxDocs.reduce((s: number, d: any) => s + Number(d.amount ?? 0), 0)
+    const totalFiluxCount   = fluxDocs.length
+    const totalXpayAmount   = xpayDocs.reduce((s: number, d: any) => s + Number(d.amount ?? 0), 0)
+    const totalXpayCount    = xpayDocs.length
+
+    // 3. campaigntransactions — kampanya bonusları
     const campQuery: Record<string, unknown> = { status: "completed" }
     if (hasDate) campQuery.createdAt = dateRange
 
@@ -114,6 +136,13 @@ export async function GET(req: NextRequest) {
     })
 
     // 5. Her kullanıcı için özet oluştur
+    interface DepositLog {
+      id: string
+      amount: number
+      status: string | null
+      createdAt: string
+    }
+
     interface UserBalance {
       userId: string
       username: string
@@ -144,6 +173,8 @@ export async function GET(req: NextRequest) {
         mode: string | null
         createdAt: string
       }[]
+      filuxLogs: DepositLog[]
+      xpayLogs: DepositLog[]
     }
 
     const userBalMap: Record<string, UserBalance> = {}
@@ -166,6 +197,8 @@ export async function GET(req: NextRequest) {
           campaignCount: 0,
           bonusLogs:     [],
           campaignLogs:  [],
+          filuxLogs:     [],
+          xpayLogs:      [],
         }
       }
       return userBalMap[uid]
@@ -210,6 +243,34 @@ export async function GET(req: NextRequest) {
       })
     }
 
+    // Filux logs — kullanıcı bazında eşleştir (userId veya user alanı)
+    for (const d of fluxDocs) {
+      const uid = String(d.userId ?? d.user ?? "")
+      if (!uid) continue
+      if (userBalMap[uid]) {
+        userBalMap[uid].filuxLogs.push({
+          id:        String(d._id),
+          amount:    Number(d.amount ?? 0),
+          status:    d.status ?? null,
+          createdAt: d.createdAt instanceof Date ? d.createdAt.toISOString() : String(d.createdAt ?? ""),
+        })
+      }
+    }
+
+    // xPayment logs
+    for (const d of xpayDocs) {
+      const uid = String(d.userId ?? d.user ?? "")
+      if (!uid) continue
+      if (userBalMap[uid]) {
+        userBalMap[uid].xpayLogs.push({
+          id:        String(d._id),
+          amount:    Number(d.amount ?? 0),
+          status:    d.status ?? null,
+          createdAt: d.createdAt instanceof Date ? d.createdAt.toISOString() : String(d.createdAt ?? ""),
+        })
+      }
+    }
+
     // 6. Filter out users that couldn't be resolved in MongoDB (username would be null/ObjectId)
     let allUsers = Object.values(userBalMap).filter(u => u.username != null && u.username !== "")
     if (search) {
@@ -229,13 +290,41 @@ export async function GET(req: NextRequest) {
     const paginated  = allUsers.slice(skip, skip + limit)
 
     // 8. Global summary
+    // Bonus kind breakdown: "bonus" vs "balance" (from adminmanualadjustments.kind)
+    let totalBonusKindAmount  = 0
+    let totalBonusKindCount   = 0
+    let totalBalanceKindAmount = 0
+    let totalBalanceKindCount  = 0
+
+    for (const u of allUsers) {
+      for (const log of u.bonusLogs) {
+        if (log.type === "bonus") {
+          totalBonusKindAmount += log.amount
+          totalBonusKindCount  += 1
+        } else if (log.type === "balance") {
+          totalBalanceKindAmount += log.amount
+          totalBalanceKindCount  += 1
+        }
+      }
+    }
+
     const summary = {
-      totalBonus:        allUsers.reduce((s, u) => s + u.totalBonus, 0),
-      totalCampaign:     allUsers.reduce((s, u) => s + u.totalCampaign, 0),
-      totalBalance:      allUsers.reduce((s, u) => s + u.totalBalance, 0),
-      totalUsers:        totalCount,
-      totalBonusCount:   allUsers.reduce((s, u) => s + u.bonusCount, 0),
-      totalCampaignCount:allUsers.reduce((s, u) => s + u.campaignCount, 0),
+      totalBonus:           allUsers.reduce((s, u) => s + u.totalBonus, 0),
+      totalCampaign:        allUsers.reduce((s, u) => s + u.totalCampaign, 0),
+      totalBalance:         allUsers.reduce((s, u) => s + u.totalBalance, 0),
+      totalUsers:           totalCount,
+      totalBonusCount:      allUsers.reduce((s, u) => s + u.bonusCount, 0),
+      totalCampaignCount:   allUsers.reduce((s, u) => s + u.campaignCount, 0),
+      // kind breakdown
+      totalBonusKindAmount,
+      totalBonusKindCount,
+      totalBalanceKindAmount,
+      totalBalanceKindCount,
+      // ödeme yöntemi deposit totalleri
+      totalFiluxAmount,
+      totalFiluxCount,
+      totalXpayAmount,
+      totalXpayCount,
     }
 
     return NextResponse.json({
