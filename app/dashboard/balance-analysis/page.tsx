@@ -271,12 +271,19 @@ export default function BalanceAnalysisPage() {
       {summary && (
         <div className="flex flex-col gap-3">
           {/* Satır 1: Toplam + Manuel ayrımı */}
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
             {/* Toplam Yüklenen — büyük kart */}
             <div className="bg-card border border-border rounded-2xl p-4 col-span-2 md:col-span-1 xl:col-span-1">
               <p className="text-xs text-muted-foreground mb-1">Toplam Yüklenen</p>
               <p className="text-xl font-bold text-primary">₺{fmt(summary.totalBalance)}</p>
               <p className="text-[11px] text-muted-foreground/50 mt-1">{summary.totalUsers.toLocaleString("tr-TR")} üye</p>
+            </div>
+
+            {/* Toplam Deposit (Filux + xPayment) */}
+            <div className="bg-card border border-orange-500/20 rounded-2xl p-4">
+              <p className="text-xs text-muted-foreground mb-1">Toplam Deposit</p>
+              <p className="text-xl font-bold text-orange-400">₺{fmt(summary.totalFiluxAmount + summary.totalXpayAmount)}</p>
+              <p className="text-[11px] text-orange-400/60 mt-1">{(summary.totalFiluxCount + summary.totalXpayCount)} işlem (Filux + xPayment)</p>
             </div>
 
             {/* Eklenen Bonus (kind=bonus) */}
