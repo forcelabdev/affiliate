@@ -153,6 +153,10 @@ export default function BalanceAnalysisPage() {
   const [searchInput, setSearchInput] = useState("")
   const searchTimeout                  = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // Agent bakiye
+  const [agentRemaining, setAgentRemaining] = useState<number | null>(null)
+  const [agentDeposit, setAgentDeposit]     = useState<number | null>(null)
+
   // Data
   const [users, setUsers]       = useState<UserBalance[]>([])
   const [summary, setSummary]   = useState<Summary | null>(null)
@@ -197,6 +201,22 @@ export default function BalanceAnalysisPage() {
   }, [token, period, appliedStart, appliedEnd, search])
 
   useEffect(() => { if (token) fetchData(1) }, [fetchData, token])
+
+  // Kalan agent bakiyesini çek (her zaman 04/08/2026 18:20 sonrası baz alınır)
+  useEffect(() => {
+    if (!token) return
+    fetch("/api/affiliate/balance-analysis?agentBalance=true", {
+      headers: { "x-auth-token": token },
+    })
+      .then(r => r.json())
+      .then(json => {
+        if (json.success) {
+          setAgentRemaining(json.remaining)
+          setAgentDeposit(json.depositSum)
+        }
+      })
+      .catch(e => console.error("[BalanceAnalysis] agentBalance fetch error:", e))
+  }, [token])
 
   function handleSearchInput(v: string) {
     setSearchInput(v)
@@ -342,6 +362,31 @@ export default function BalanceAnalysisPage() {
           </div>
         </div>
       )}
+
+      {/* Kalan Agent Bakiyesi */}
+      <div className="flex items-center justify-between gap-4 px-5 py-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 min-w-0">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0 animate-pulse" />
+          <span className="text-sm font-semibold text-muted-foreground whitespace-nowrap">Kalan Agent Bakiyesi</span>
+          <span className="text-xs text-muted-foreground/50 whitespace-nowrap hidden sm:inline">(04/08/2026 18:20 tarihinden itibaren yapılan toplam deposit düşülmüştür)</span>
+        </div>
+        <div className="flex items-center gap-3 flex-shrink-0">
+          {agentDeposit !== null && (
+            <span className="text-xs text-muted-foreground whitespace-nowrap">
+              ₺980.000,00 &minus; ₺{fmt(agentDeposit)} =
+            </span>
+          )}
+          <span className={`text-xl font-bold font-mono whitespace-nowrap ${
+            agentRemaining === null
+              ? "text-muted-foreground animate-pulse"
+              : agentRemaining >= 0
+                ? "text-emerald-400"
+                : "text-red-400"
+          }`}>
+            {agentRemaining === null ? "Yükleniyor..." : `₺${fmt(agentRemaining)}`}
+          </span>
+        </div>
+      </div>
 
       {/* Search */}
       <div className="relative">
