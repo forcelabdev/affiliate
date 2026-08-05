@@ -70,6 +70,42 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: true, bonusSum, remaining })
     }
 
+    // Bonus alan kullanıcılar listesi: 31.07.2026 sonrası kind=bonus credit kayıtları
+    if (searchParams.get("listBonusUsers") === "true") {
+      await connectDB()
+      const db = mongoose.connection.db!
+      const rows = await db.collection("adminmanualadjustments")
+        .find(
+          {
+            direction: "credit",
+            kind: "bonus",
+            createdAt: { $gt: BONUS_BALANCE_ORIGIN },
+          },
+          {
+            projection: {
+              targetUser: 1,
+              targetSnapshot: 1,
+              appliedAmount: 1,
+              requestedAmount: 1,
+              note: 1,
+              createdAt: 1,
+            },
+          }
+        )
+        .sort({ createdAt: -1 })
+        .toArray()
+
+      const items = rows.map((r: any) => ({
+        userId:    String(r.targetUser),
+        username:  r.targetSnapshot?.username ?? "—",
+        amount:    Number(r.appliedAmount ?? r.requestedAmount ?? 0),
+        note:      r.note ?? null,
+        createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt ?? ""),
+      }))
+
+      return NextResponse.json({ success: true, items })
+    }
+
     const startDateParam = searchParams.get("startDate")
     const endDateParam   = searchParams.get("endDate")
     const search         = searchParams.get("search")?.trim() || ""

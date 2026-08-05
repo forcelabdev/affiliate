@@ -164,6 +164,12 @@ export default function BalanceAnalysisPage() {
   // Bonus bakiye
   const [bonusRemaining, setBonusRemaining] = useState<number | null>(null)
 
+  // Bonus kullanıcılar modal
+  interface BonusUserItem { userId: string; username: string; amount: number; note: string | null; createdAt: string }
+  const [bonusModalOpen, setBonusModalOpen]   = useState(false)
+  const [bonusUserList, setBonusUserList]     = useState<BonusUserItem[]>([])
+  const [bonusListLoading, setBonusListLoading] = useState(false)
+
   // Data
   const [users, setUsers]       = useState<UserBalance[]>([])
   const [summary, setSummary]   = useState<Summary | null>(null)
@@ -237,6 +243,19 @@ export default function BalanceAnalysisPage() {
       })
       .catch(e => console.error("[BalanceAnalysis] bonusBalance fetch error:", e))
   }, [token])
+
+  function openBonusModal() {
+    setBonusModalOpen(true)
+    if (bonusUserList.length > 0) return // zaten yüklüyse tekrar çekme
+    setBonusListLoading(true)
+    fetch("/api/affiliate/balance-analysis?listBonusUsers=true", {
+      headers: { "x-auth-token": token },
+    })
+      .then(r => r.json())
+      .then(json => { if (json.success) setBonusUserList(json.items ?? []) })
+      .catch(e => console.error("[BalanceAnalysis] listBonusUsers error:", e))
+      .finally(() => setBonusListLoading(false))
+  }
 
   function handleSearchInput(v: string) {
     setSearchInput(v)
@@ -431,10 +450,14 @@ export default function BalanceAnalysisPage() {
       </div>
 
       {/* Kalan Bonus Bakiyesi */}
-      <div className="flex items-center justify-between gap-4 px-5 py-4 rounded-2xl border border-amber-500/30 bg-amber-500/5 min-w-0">
+      <button
+        onClick={openBonusModal}
+        className="flex items-center justify-between gap-4 px-5 py-4 rounded-2xl border border-amber-500/30 bg-amber-500/5 min-w-0 w-full text-left hover:bg-amber-500/10 transition-colors group"
+      >
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0 animate-pulse" />
           <span className="text-sm font-semibold text-muted-foreground whitespace-nowrap">Kalan Bonus Bakiyesi</span>
+          <span className="text-xs text-amber-500/50 group-hover:text-amber-500/80 transition-colors whitespace-nowrap hidden sm:inline">— kimlere eklendi?</span>
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
           <span className={`text-xl font-bold font-mono whitespace-nowrap ${
@@ -446,8 +469,84 @@ export default function BalanceAnalysisPage() {
           }`}>
             {bonusRemaining === null ? "Yükleniyor..." : `₺${fmt(bonusRemaining)}`}
           </span>
+          <svg className="w-4 h-4 text-amber-500/50 group-hover:text-amber-500 transition-colors flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/>
+          </svg>
         </div>
-      </div>
+      </button>
+
+      {/* Bonus Kullanıcılar Modal */}
+      {bonusModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setBonusModalOpen(false)} />
+          <div className="relative bg-card border border-border rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border flex-shrink-0">
+              <div>
+                <h2 className="text-base font-semibold text-foreground">Manuel Eklenen Bonuslar</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">31.07.2026 tarihinden itibaren bonus eklenen üyeler</p>
+              </div>
+              <button
+                onClick={() => setBonusModalOpen(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-secondary transition-colors text-muted-foreground"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
+            {/* Modal Body */}
+            <div className="overflow-y-auto flex-1 px-6 py-4">
+              {bonusListLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <svg className="animate-spin h-7 w-7 text-amber-400" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                  </svg>
+                </div>
+              ) : bonusUserList.length === 0 ? (
+                <p className="text-center text-muted-foreground py-16 text-sm">Kayıt bulunamadı.</p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs text-muted-foreground border-b border-border">
+                      <th className="pb-2 pr-4 font-medium">Kullanıcı</th>
+                      <th className="pb-2 pr-4 font-medium text-right">Tutar</th>
+                      <th className="pb-2 pr-4 font-medium">Not</th>
+                      <th className="pb-2 font-medium">Tarih</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bonusUserList.map((item, i) => (
+                      <tr key={i} className="border-b border-border/50 hover:bg-secondary/30 transition-colors">
+                        <td className="py-2.5 pr-4 font-mono text-xs text-foreground">{item.username}</td>
+                        <td className="py-2.5 pr-4 text-right font-bold text-amber-400 font-mono whitespace-nowrap">
+                          ₺{fmt(item.amount)}
+                        </td>
+                        <td className="py-2.5 pr-4 text-muted-foreground text-xs max-w-[140px] truncate">{item.note ?? "—"}</td>
+                        <td className="py-2.5 text-muted-foreground/70 text-xs whitespace-nowrap">{fmtDate(item.createdAt)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  {/* Toplam satırı */}
+                  <tfoot>
+                    <tr className="border-t border-border">
+                      <td className="pt-3 pr-4 text-xs text-muted-foreground font-medium">
+                        Toplam ({bonusUserList.length} işlem)
+                      </td>
+                      <td className="pt-3 pr-4 text-right font-bold text-amber-400 font-mono whitespace-nowrap">
+                        ₺{fmt(bonusUserList.reduce((s, i) => s + i.amount, 0))}
+                      </td>
+                      <td colSpan={2} />
+                    </tr>
+                  </tfoot>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {/* Search */}
       <div className="relative">
