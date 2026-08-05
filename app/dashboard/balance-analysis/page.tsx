@@ -144,11 +144,15 @@ export default function BalanceAnalysisPage() {
 
   // Filters
   const [period, setPeriod]           = useState("all")
-  const [customStart, setCustomStart] = useState("")
-  const [customEnd, setCustomEnd]     = useState("")
+  const [customStart, setCustomStart]         = useState("")
+  const [customEnd, setCustomEnd]             = useState("")
+  const [customStartTime, setCustomStartTime] = useState("00:00")
+  const [customEndTime, setCustomEndTime]     = useState("23:59")
   // appliedStart/End are only updated when the user clicks "Uygula" — never on every keystroke
-  const [appliedStart, setAppliedStart] = useState("")
-  const [appliedEnd, setAppliedEnd]     = useState("")
+  const [appliedStart, setAppliedStart]       = useState("")
+  const [appliedEnd, setAppliedEnd]           = useState("")
+  const [appliedStartTime, setAppliedStartTime] = useState("00:00")
+  const [appliedEndTime, setAppliedEndTime]     = useState("23:59")
   const [search, setSearch]           = useState("")
   const [searchInput, setSearchInput] = useState("")
   const searchTimeout                  = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -156,6 +160,9 @@ export default function BalanceAnalysisPage() {
   // Agent bakiye
   const [agentRemaining, setAgentRemaining] = useState<number | null>(null)
   const [agentDeposit, setAgentDeposit]     = useState<number | null>(null)
+
+  // Bonus bakiye
+  const [bonusRemaining, setBonusRemaining] = useState<number | null>(null)
 
   // Data
   const [users, setUsers]       = useState<UserBalance[]>([])
@@ -177,8 +184,8 @@ export default function BalanceAnalysisPage() {
       if (search) params.set("search", search)
       const range = period === "custom"
         ? {
-            startDate: appliedStart ? new Date(appliedStart).getTime() : undefined,
-            endDate:   appliedEnd   ? new Date(appliedEnd + "T23:59:59").getTime() : undefined,
+            startDate: appliedStart ? new Date(`${appliedStart}T${appliedStartTime}:00`).getTime() : undefined,
+            endDate:   appliedEnd   ? new Date(`${appliedEnd}T${appliedEndTime}:59`).getTime()     : undefined,
           }
         : getDateRange(period)
       if (range.startDate) params.set("startDate", String(range.startDate))
@@ -198,7 +205,7 @@ export default function BalanceAnalysisPage() {
       }
     } catch (e) { console.error("[BalanceAnalysis] fetch error:", e) }
     finally { setLoading(false) }
-  }, [token, period, appliedStart, appliedEnd, search])
+  }, [token, period, appliedStart, appliedEnd, appliedStartTime, appliedEndTime, search])
 
   useEffect(() => { if (token) fetchData(1) }, [fetchData, token])
 
@@ -216,6 +223,19 @@ export default function BalanceAnalysisPage() {
         }
       })
       .catch(e => console.error("[BalanceAnalysis] agentBalance fetch error:", e))
+  }, [token])
+
+  // Kalan bonus bakiyesini çek (her zaman 31.07.2026 sonrası baz alınır)
+  useEffect(() => {
+    if (!token) return
+    fetch("/api/affiliate/balance-analysis?bonusBalance=true", {
+      headers: { "x-auth-token": token },
+    })
+      .then(r => r.json())
+      .then(json => {
+        if (json.success) setBonusRemaining(json.remaining)
+      })
+      .catch(e => console.error("[BalanceAnalysis] bonusBalance fetch error:", e))
   }, [token])
 
   function handleSearchInput(v: string) {
@@ -275,22 +295,50 @@ export default function BalanceAnalysisPage() {
         ))}
       </div>
 
-      {/* Custom date */}
+      {/* Custom date + time */}
       {period === "custom" && (
         <div className="flex items-center gap-3 flex-wrap">
+          {/* Başlangıç */}
           <div className="flex items-center gap-2">
-            <label className="text-sm text-muted-foreground">Başlangıç:</label>
-            <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)}
-              className="px-3 py-1.5 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"/>
+            <label className="text-sm text-muted-foreground whitespace-nowrap">Başlangıç:</label>
+            <input
+              type="date"
+              value={customStart}
+              onChange={e => setCustomStart(e.target.value)}
+              className="px-3 py-1.5 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+            />
+            <input
+              type="time"
+              value={customStartTime}
+              onChange={e => setCustomStartTime(e.target.value)}
+              className="px-3 py-1.5 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 w-28"
+            />
           </div>
+          {/* Bitiş */}
           <div className="flex items-center gap-2">
-            <label className="text-sm text-muted-foreground">Bitiş:</label>
-            <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)}
-              className="px-3 py-1.5 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"/>
+            <label className="text-sm text-muted-foreground whitespace-nowrap">Bitiş:</label>
+            <input
+              type="date"
+              value={customEnd}
+              onChange={e => setCustomEnd(e.target.value)}
+              className="px-3 py-1.5 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+            />
+            <input
+              type="time"
+              value={customEndTime}
+              onChange={e => setCustomEndTime(e.target.value)}
+              className="px-3 py-1.5 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 w-28"
+            />
           </div>
           <button
-            onClick={() => { setAppliedStart(customStart); setAppliedEnd(customEnd) }}
-            className="px-4 py-1.5 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors">
+            onClick={() => {
+              setAppliedStart(customStart)
+              setAppliedEnd(customEnd)
+              setAppliedStartTime(customStartTime)
+              setAppliedEndTime(customEndTime)
+            }}
+            className="px-4 py-1.5 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+          >
             Uygula
           </button>
         </div>
@@ -378,6 +426,25 @@ export default function BalanceAnalysisPage() {
                 : "text-red-400"
           }`}>
             {agentRemaining === null ? "Yükleniyor..." : `₺${fmt(agentRemaining)}`}
+          </span>
+        </div>
+      </div>
+
+      {/* Kalan Bonus Bakiyesi */}
+      <div className="flex items-center justify-between gap-4 px-5 py-4 rounded-2xl border border-amber-500/30 bg-amber-500/5 min-w-0">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0 animate-pulse" />
+          <span className="text-sm font-semibold text-muted-foreground whitespace-nowrap">Kalan Bonus Bakiyesi</span>
+        </div>
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <span className={`text-xl font-bold font-mono whitespace-nowrap ${
+            bonusRemaining === null
+              ? "text-muted-foreground animate-pulse"
+              : bonusRemaining >= 0
+                ? "text-amber-400"
+                : "text-red-400"
+          }`}>
+            {bonusRemaining === null ? "Yükleniyor..." : `₺${fmt(bonusRemaining)}`}
           </span>
         </div>
       </div>

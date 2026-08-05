@@ -8,6 +8,10 @@ import { neon } from "@neondatabase/serverless"
 const AGENT_BALANCE_ORIGIN = new Date("2026-08-04T15:20:00.000Z")
 const AGENT_BALANCE_INITIAL = 1_010_000
 
+// Bonus bakiye: 31.07.2026 00:00 Türkiye saati = 30.07.2026 21:00 UTC
+const BONUS_BALANCE_ORIGIN  = new Date("2026-07-30T21:00:00.000Z")
+const BONUS_BALANCE_INITIAL = 2_600_000
+
 export async function GET(req: NextRequest) {
   try {
     const auth = await requireAuth(req)
@@ -38,6 +42,32 @@ export async function GET(req: NextRequest) {
       const depositSum = Number(fluxTotal[0]?.total ?? 0) + Number(xpayTotal[0]?.total ?? 0)
       const remaining  = AGENT_BALANCE_INITIAL - depositSum
       return NextResponse.json({ success: true, depositSum, remaining })
+    }
+
+    // Kalan bonus bakiyesi modu: 31.07.2026 sonrası manuel eklenen bonus toplamını hesapla
+    if (searchParams.get("bonusBalance") === "true") {
+      await connectDB()
+      const db = mongoose.connection.db!
+      const bonusResult = await db.collection("adminmanualadjustments")
+        .aggregate([
+          {
+            $match: {
+              direction: "credit",
+              kind: "bonus",
+              createdAt: { $gt: BONUS_BALANCE_ORIGIN },
+            },
+          },
+          {
+            $group: {
+              _id: null,
+              total: { $sum: { $ifNull: ["$appliedAmount", "$requestedAmount"] } },
+            },
+          },
+        ])
+        .toArray()
+      const bonusSum  = Number(bonusResult[0]?.total ?? 0)
+      const remaining = BONUS_BALANCE_INITIAL - bonusSum
+      return NextResponse.json({ success: true, bonusSum, remaining })
     }
 
     const startDateParam = searchParams.get("startDate")
