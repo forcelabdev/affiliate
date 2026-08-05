@@ -371,11 +371,6 @@ export default function BalanceAnalysisPage() {
           <span className="text-xs text-muted-foreground/50 whitespace-nowrap hidden sm:inline">(04/08/2026 18:20 tarihinden itibaren yapılan toplam deposit düşülmüştür)</span>
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
-          {agentDeposit !== null && (
-            <span className="text-xs text-muted-foreground whitespace-nowrap">
-              ₺980.000,00 &minus; ₺{fmt(agentDeposit)} =
-            </span>
-          )}
           <span className={`text-xl font-bold font-mono whitespace-nowrap ${
             agentRemaining === null
               ? "text-muted-foreground animate-pulse"
