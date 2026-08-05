@@ -4,6 +4,10 @@ import mongoose from "mongoose"
 import { connectDB } from "@/lib/connectDB"
 import { neon } from "@neondatabase/serverless"
 
+// Sabit başlangıç noktası: 04/08/2026 18:20 (Türkiye saati = UTC+3 => 15:20 UTC)
+const AGENT_BALANCE_ORIGIN = new Date("2026-08-04T15:20:00.000Z")
+const AGENT_BALANCE_INITIAL = 1_010_000
+
 export async function GET(req: NextRequest) {
   try {
     const auth = await requireAuth(req)
@@ -16,6 +20,26 @@ export async function GET(req: NextRequest) {
     }
 
     const { searchParams } = new URL(req.url)
+
+    // Kalan agent bakiyesi modu: sadece deposit toplamını hesapla
+    if (searchParams.get("agentBalance") === "true") {
+      await connectDB()
+      const db = mongoose.connection.db!
+      const afterOrigin = { createdAt: { $gt: AGENT_BALANCE_ORIGIN } }
+      const depositQuery = { type: "deposit", status: "approved", ...afterOrigin }
+      const [fluxTotal, xpayTotal] = await Promise.all([
+        db.collection("fluxkriptotransactions")
+          .aggregate([{ $match: depositQuery }, { $group: { _id: null, total: { $sum: "$amount" } } }])
+          .toArray(),
+        db.collection("xpaymenttransactions")
+          .aggregate([{ $match: depositQuery }, { $group: { _id: null, total: { $sum: "$amount" } } }])
+          .toArray(),
+      ])
+      const depositSum = Number(fluxTotal[0]?.total ?? 0) + Number(xpayTotal[0]?.total ?? 0)
+      const remaining  = AGENT_BALANCE_INITIAL - depositSum
+      return NextResponse.json({ success: true, depositSum, remaining })
+    }
+
     const startDateParam = searchParams.get("startDate")
     const endDateParam   = searchParams.get("endDate")
     const search         = searchParams.get("search")?.trim() || ""
