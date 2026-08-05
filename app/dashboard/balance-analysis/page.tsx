@@ -161,6 +161,9 @@ export default function BalanceAnalysisPage() {
   const [agentRemaining, setAgentRemaining] = useState<number | null>(null)
   const [agentDeposit, setAgentDeposit]     = useState<number | null>(null)
 
+  // Bonus bakiye
+  const [bonusRemaining, setBonusRemaining] = useState<number | null>(null)
+
   // Data
   const [users, setUsers]       = useState<UserBalance[]>([])
   const [summary, setSummary]   = useState<Summary | null>(null)
@@ -220,6 +223,19 @@ export default function BalanceAnalysisPage() {
         }
       })
       .catch(e => console.error("[BalanceAnalysis] agentBalance fetch error:", e))
+  }, [token])
+
+  // Kalan bonus bakiyesini çek (her zaman 31.07.2026 sonrası baz alınır)
+  useEffect(() => {
+    if (!token) return
+    fetch("/api/affiliate/balance-analysis?bonusBalance=true", {
+      headers: { "x-auth-token": token },
+    })
+      .then(r => r.json())
+      .then(json => {
+        if (json.success) setBonusRemaining(json.remaining)
+      })
+      .catch(e => console.error("[BalanceAnalysis] bonusBalance fetch error:", e))
   }, [token])
 
   function handleSearchInput(v: string) {
@@ -410,6 +426,25 @@ export default function BalanceAnalysisPage() {
                 : "text-red-400"
           }`}>
             {agentRemaining === null ? "Yükleniyor..." : `₺${fmt(agentRemaining)}`}
+          </span>
+        </div>
+      </div>
+
+      {/* Kalan Bonus Bakiyesi */}
+      <div className="flex items-center justify-between gap-4 px-5 py-4 rounded-2xl border border-amber-500/30 bg-amber-500/5 min-w-0">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0 animate-pulse" />
+          <span className="text-sm font-semibold text-muted-foreground whitespace-nowrap">Kalan Bonus Bakiyesi</span>
+        </div>
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <span className={`text-xl font-bold font-mono whitespace-nowrap ${
+            bonusRemaining === null
+              ? "text-muted-foreground animate-pulse"
+              : bonusRemaining >= 0
+                ? "text-amber-400"
+                : "text-red-400"
+          }`}>
+            {bonusRemaining === null ? "Yükleniyor..." : `₺${fmt(bonusRemaining)}`}
           </span>
         </div>
       </div>
