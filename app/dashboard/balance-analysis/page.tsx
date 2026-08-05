@@ -144,11 +144,15 @@ export default function BalanceAnalysisPage() {
 
   // Filters
   const [period, setPeriod]           = useState("all")
-  const [customStart, setCustomStart] = useState("")
-  const [customEnd, setCustomEnd]     = useState("")
+  const [customStart, setCustomStart]         = useState("")
+  const [customEnd, setCustomEnd]             = useState("")
+  const [customStartTime, setCustomStartTime] = useState("00:00")
+  const [customEndTime, setCustomEndTime]     = useState("23:59")
   // appliedStart/End are only updated when the user clicks "Uygula" — never on every keystroke
-  const [appliedStart, setAppliedStart] = useState("")
-  const [appliedEnd, setAppliedEnd]     = useState("")
+  const [appliedStart, setAppliedStart]       = useState("")
+  const [appliedEnd, setAppliedEnd]           = useState("")
+  const [appliedStartTime, setAppliedStartTime] = useState("00:00")
+  const [appliedEndTime, setAppliedEndTime]     = useState("23:59")
   const [search, setSearch]           = useState("")
   const [searchInput, setSearchInput] = useState("")
   const searchTimeout                  = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -177,8 +181,8 @@ export default function BalanceAnalysisPage() {
       if (search) params.set("search", search)
       const range = period === "custom"
         ? {
-            startDate: appliedStart ? new Date(appliedStart).getTime() : undefined,
-            endDate:   appliedEnd   ? new Date(appliedEnd + "T23:59:59").getTime() : undefined,
+            startDate: appliedStart ? new Date(`${appliedStart}T${appliedStartTime}:00`).getTime() : undefined,
+            endDate:   appliedEnd   ? new Date(`${appliedEnd}T${appliedEndTime}:59`).getTime()     : undefined,
           }
         : getDateRange(period)
       if (range.startDate) params.set("startDate", String(range.startDate))
@@ -198,7 +202,7 @@ export default function BalanceAnalysisPage() {
       }
     } catch (e) { console.error("[BalanceAnalysis] fetch error:", e) }
     finally { setLoading(false) }
-  }, [token, period, appliedStart, appliedEnd, search])
+  }, [token, period, appliedStart, appliedEnd, appliedStartTime, appliedEndTime, search])
 
   useEffect(() => { if (token) fetchData(1) }, [fetchData, token])
 
@@ -275,22 +279,50 @@ export default function BalanceAnalysisPage() {
         ))}
       </div>
 
-      {/* Custom date */}
+      {/* Custom date + time */}
       {period === "custom" && (
         <div className="flex items-center gap-3 flex-wrap">
+          {/* Başlangıç */}
           <div className="flex items-center gap-2">
-            <label className="text-sm text-muted-foreground">Başlangıç:</label>
-            <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)}
-              className="px-3 py-1.5 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"/>
+            <label className="text-sm text-muted-foreground whitespace-nowrap">Başlangıç:</label>
+            <input
+              type="date"
+              value={customStart}
+              onChange={e => setCustomStart(e.target.value)}
+              className="px-3 py-1.5 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+            />
+            <input
+              type="time"
+              value={customStartTime}
+              onChange={e => setCustomStartTime(e.target.value)}
+              className="px-3 py-1.5 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 w-28"
+            />
           </div>
+          {/* Bitiş */}
           <div className="flex items-center gap-2">
-            <label className="text-sm text-muted-foreground">Bitiş:</label>
-            <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)}
-              className="px-3 py-1.5 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"/>
+            <label className="text-sm text-muted-foreground whitespace-nowrap">Bitiş:</label>
+            <input
+              type="date"
+              value={customEnd}
+              onChange={e => setCustomEnd(e.target.value)}
+              className="px-3 py-1.5 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+            />
+            <input
+              type="time"
+              value={customEndTime}
+              onChange={e => setCustomEndTime(e.target.value)}
+              className="px-3 py-1.5 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 w-28"
+            />
           </div>
           <button
-            onClick={() => { setAppliedStart(customStart); setAppliedEnd(customEnd) }}
-            className="px-4 py-1.5 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors">
+            onClick={() => {
+              setAppliedStart(customStart)
+              setAppliedEnd(customEnd)
+              setAppliedStartTime(customStartTime)
+              setAppliedEndTime(customEndTime)
+            }}
+            className="px-4 py-1.5 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+          >
             Uygula
           </button>
         </div>
