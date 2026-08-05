@@ -368,7 +368,6 @@ export default function BalanceAnalysisPage() {
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0 animate-pulse" />
           <span className="text-sm font-semibold text-muted-foreground whitespace-nowrap">Kalan Agent Bakiyesi</span>
-          <span className="text-xs text-muted-foreground/50 whitespace-nowrap hidden sm:inline">(04/08/2026 18:20 tarihinden itibaren yapılan toplam deposit düşülmüştür)</span>
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
           <span className={`text-xl font-bold font-mono whitespace-nowrap ${
