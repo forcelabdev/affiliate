@@ -173,12 +173,12 @@ export async function GET(req: NextRequest) {
       depositBreakdown = { forcelab: forcelabTotal, meeldev: meeldevTotal, filux: fluxTotal, xpayment: xpayTotal, manual: 0 }
     }
 
-    // Manuel (görsel amaçlı) yatırım toplamları.
-    // - Partner kendi panelinde: Toplam Deposit'e DAHİL edilir.
-    // - Superadmin'in "tüm partnerler" görünümünde: Toplam Deposit'e dahil edilmez,
-    //   sadece Ödeme Yöntemi Dağılımı kartında ayrı bir bilgi olarak gösterilir.
+    // Manuel (görsel amaçlı) yatırım toplamları — Genel Bakış'taki TÜM istatistiklere
+    // (Toplam Deposit, Komisyon, Ödeme Yöntemi Dağılımı) dahil edilir.
+    // Sadece Bakiye Analizi sayfası (ayrı bir route/endpoint) buna dahil değildir.
     if (isAdminAll) {
       const manualTotalsOverall = await getManualTotalsOverall()
+      totalDeposits += manualTotalsOverall.deposit
       depositBreakdown.manual = manualTotalsOverall.deposit
     } else if (referralUsers.length > 0) {
       const manualTotalsByUsername = await getManualTotalsForUsers(referralUsers.map((u: any) => u.username))

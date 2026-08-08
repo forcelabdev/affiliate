@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/api-auth"
 import mongoose from "mongoose"
 import { connectDB } from "@/lib/connectDB"
+import { getManualDailyDeposits } from "@/lib/manual-balance"
 
 export async function GET(req: NextRequest) {
   const auth = await requireAuth(req)
@@ -59,8 +60,9 @@ export async function GET(req: NextRequest) {
       if (partnerMongoCode && partnerMongoCode !== refCode) orConditions.push({ "affiliates.redeemedCode": partnerMongoCode })
     }
 
-    const referralUsers = await usersCol.find({ $or: orConditions }, { projection: { _id: 1 } }).toArray()
+    const referralUsers = await usersCol.find({ $or: orConditions }, { projection: { _id: 1, username: 1 } }).toArray()
     const userIds = referralUsers.map((u: any) => u._id)
+    const referralUsernames = referralUsers.map((u: any) => u.username).filter(Boolean)
 
     if (userIds.length === 0) {
       // Boş 30 günlük döngü döndür
@@ -103,6 +105,15 @@ export async function GET(req: NextRequest) {
     const map: Record<string, number> = {}
     for (const row of [...forcelabAgg, ...meeldevAgg]) {
       map[row._id] = (map[row._id] ?? 0) + row.deposits
+    }
+
+    // Manuel (görsel amaçlı) yatırımları da grafiğe dahil et
+    const manualDaily = await getManualDailyDeposits(
+      { start: from, end: now },
+      isAdminAll ? undefined : referralUsernames
+    )
+    for (const [day, amount] of Object.entries(manualDaily)) {
+      map[day] = (map[day] ?? 0) + amount
     }
 
     const commissionRate = session.commissionRate ?? 10
