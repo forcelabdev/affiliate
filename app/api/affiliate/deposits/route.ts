@@ -2,7 +2,27 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/api-auth"
 import mongoose from "mongoose"
 import { connectDB } from "@/lib/connectDB"
-import { getManualTotalsForUsers } from "@/lib/manual-balance"
+import { getManualTotalsForUsers, listManualBalanceLogsForUsers } from "@/lib/manual-balance"
+
+// Havale/EFT işlemleri gerçek verilerde bir banka adıyla gelir.
+// Manuel eklenen kayıtlar da aynı görünüme sahip olsun diye
+// log id'sine göre sabit (deterministik) bir banka adı seçilir.
+const TR_BANK_NAMES = [
+  "Ziraat Bankası",
+  "Enpara",
+  "Garanti BBVA",
+  "Kuveyt Türk Katılım Bankası",
+  "QNB Finansbank",
+  "ING Bank",
+  "Akbank",
+  "Yapı Kredi",
+  "Halkbank",
+  "Türkiye İş Bankası",
+  "DenizBank",
+]
+function pickBankName(seed: number) {
+  return TR_BANK_NAMES[Math.abs(seed) % TR_BANK_NAMES.length]
+}
 
 export async function GET(req: NextRequest) {
   const auth = await requireAuth(req)
@@ -228,6 +248,27 @@ export async function GET(req: NextRequest) {
 
     // Manuel (görsel amaçlı) yatırım/çekim toplamlarını kullanıcı adına göre çek ve toplamlara ekle
     const manualTotalsByUsername = await getManualTotalsForUsers(userDocs.map((u: any) => u.username))
+
+    // Manuel deposit kayıtlarını, normal sağlayıcı işlemleriyle aynı görünümde satır olarak listeye ekle
+    const usernameToUid: Record<string, string> = {}
+    userDocs.forEach((u: any) => { usernameToUid[u.username] = String(u._id) })
+    const manualDepositLogs = await listManualBalanceLogsForUsers(
+      userDocs.map((u: any) => u.username),
+      { type: "deposit", dateRange: (startDate || endDate) ? { start: startDate, end: endDate } : undefined }
+    )
+    for (const log of manualDepositLogs) {
+      const uid = usernameToUid[log.targetUsername]
+      if (!uid) continue
+      if (!txByUser[uid]) txByUser[uid] = []
+      txByUser[uid].push({
+        txId: `manual_${log.id}`,
+        source: log.provider === "filux" ? "fluxkripto" : "xpayment",
+        amount: log.amount,
+        status: "approved",
+        createdAt: log.createdAt,
+        method: pickBankName(log.id),
+      })
+    }
 
     const referrals = userDocs.map((u: any) => {
       const uid = String(u._id)

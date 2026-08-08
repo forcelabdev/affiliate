@@ -441,25 +441,9 @@ export default function ReferralsPage() {
                       <span className="font-semibold text-success">
                         ₺{(r.depositTotal ?? 0).toLocaleString("tr-TR")}
                       </span>
-                      {!!r.manualDepositTotal && (
-                        <span
-                          className="ml-1.5 text-[10px] font-semibold uppercase tracking-wide text-warning bg-warning/10 rounded px-1 py-0.5"
-                          title={`Manuel eklenen: ₺${r.manualDepositTotal.toLocaleString("tr-TR")}`}
-                        >
-                          Manuel
-                        </span>
-                      )}
                     </td>
                     <td className="px-4 py-3 hidden lg:table-cell text-destructive font-medium">
                       ₺{(r.withdrawalTotal ?? 0).toLocaleString("tr-TR")}
-                      {!!r.manualWithdrawalTotal && (
-                        <span
-                          className="ml-1.5 text-[10px] font-semibold uppercase tracking-wide text-warning bg-warning/10 rounded px-1 py-0.5"
-                          title={`Manuel eklenen: ₺${r.manualWithdrawalTotal.toLocaleString("tr-TR")}`}
-                        >
-                          Manuel
-                        </span>
-                      )}
                     </td>
                     <td className="px-4 py-3 hidden lg:table-cell">
                       <span className="font-semibold text-foreground">
@@ -625,7 +609,7 @@ export default function ReferralsPage() {
                 {/* Ayırıcı */}
                 <div className="border-t border-border"/>
 
-                {/* ── Bölüm 2: İnsiyatif Bonusu ── */}
+                {/* ── Bölüm 2: İnsiyatif Bonusu ─�� */}
                 <div className={isAffiliateUser ? "opacity-40 pointer-events-none select-none" : ""}>
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">İnsiyatif Bonusu</p>
                   <p className="text-xs text-muted-foreground mb-3">Haftada 1 kez tanımlanabilir.</p>

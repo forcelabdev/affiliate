@@ -98,7 +98,7 @@ export async function GET(req: NextRequest) {
       _id: `manual_${l.id}`,
       amount: l.amount,
       type: l.type,
-      providerName: `Manuel (${l.provider === "filux" ? "Filux" : "xPayment"})`,
+      providerName: l.provider === "filux" ? "Filux" : "xPayment",
       status: "approved",
       createdAt: l.createdAt,
       approvedAt: l.createdAt,

@@ -390,13 +390,12 @@ export default function DashboardPage() {
       {stats?.depositBreakdown && (
         <div className="flex flex-col gap-2">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Ödeme Yöntemi Dağılımı — Tüm Zamanlar</p>
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {[
               { label: "Forcelab",  value: stats.depositBreakdown.forcelab,  color: "text-foreground",   border: "border-border",          dot: "bg-muted-foreground" },
               { label: "Meeldev",   value: stats.depositBreakdown.meeldev,   color: "text-foreground",   border: "border-border",          dot: "bg-muted-foreground" },
               { label: "Filux",     value: stats.depositBreakdown.filux,     color: "text-cyan-400",     border: "border-cyan-500/20",     dot: "bg-cyan-400" },
               { label: "xPayment",  value: stats.depositBreakdown.xpayment,  color: "text-violet-400",   border: "border-violet-500/20",   dot: "bg-violet-400" },
-              { label: "Manuel",    value: stats.depositBreakdown.manual ?? 0, color: "text-warning",    border: "border-warning/20",       dot: "bg-warning" },
             ].map(item => (
               <div key={item.label} className={`bg-card border ${item.border} rounded-xl p-4`}>
                 <div className="flex items-center gap-2 mb-2">

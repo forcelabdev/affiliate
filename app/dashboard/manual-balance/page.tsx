@@ -163,7 +163,7 @@ export default function ManualBalancePage() {
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
         </svg>
         <p className="text-sm text-warning font-medium">
-          Sadece görüntüleme amaçlı. Bu ekranda oluşturulan kayıtlar gerçek bakiyeye veya MongoDB&apos;deki cüzdana yazılmaz — yalnızca raporlardaki toplamlara görsel olarak eklenir.
+          Sadece görüntüleme amaçlı. Bu ekranda oluşturulan kayıtlar gerçek bakiyeye veya cüzdana yazılmaz — yalnızca raporlardaki toplamlara görsel olarak eklenir.
         </p>
       </div>
 
