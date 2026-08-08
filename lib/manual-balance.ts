@@ -206,6 +206,36 @@ export async function listManualBalanceLogsForUsers(
   }
 }
 
+/** Kullanıcı adı kümesiyle sınırlamadan TÜM manuel kayıtları getirir (opsiyonel tip ve tarih filtresiyle).
+ *  Bakiye Analizi / grafik gibi sayfalarda, henüz başka bir koleksiyonda (bonus, kampanya vb.) görünmeyen
+ *  kullanıcıların da manuel kayıtlarının kaçırılmamasını sağlar.
+ */
+export async function listAllManualBalanceLogs(filters?: {
+  type?: ManualBalanceType
+  dateRange?: { start?: Date | null; end?: Date | null }
+}): Promise<ManualBalanceLog[]> {
+  const sql = getSql()
+  if (!sql) return []
+
+  const type = filters?.type ?? null
+  const start = filters?.dateRange?.start ?? null
+  const end = filters?.dateRange?.end ?? null
+
+  try {
+    const rows = await sql`
+      SELECT * FROM manual_balance_logs
+      WHERE (${type}::text IS NULL OR type = ${type})
+        AND (${start}::timestamptz IS NULL OR created_at >= ${start})
+        AND (${end}::timestamptz IS NULL OR created_at <= ${end})
+      ORDER BY created_at DESC
+    `
+    return (rows as any[]).map(mapRow)
+  } catch (err) {
+    console.warn("[manual-balance] listAllManualBalanceLogs error:", err)
+    return []
+  }
+}
+
 /** İşlem geçmişini listeler — en son kayıtlar önce. */
 export async function listManualBalanceLogs(params?: {
   limit?: number

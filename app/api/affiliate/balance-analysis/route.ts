@@ -3,6 +3,7 @@ import { requireAuth } from "@/lib/api-auth"
 import mongoose from "mongoose"
 import { connectDB } from "@/lib/connectDB"
 import { neon } from "@neondatabase/serverless"
+import { listAllManualBalanceLogs } from "@/lib/manual-balance"
 
 // Sabit başlangıç noktası: 04/08/2026 18:20 (Türkiye saati = UTC+3 => 15:20 UTC)
 const AGENT_BALANCE_ORIGIN = new Date("2026-08-04T15:20:00.000Z")
@@ -154,10 +155,10 @@ export async function GET(req: NextRequest) {
         .toArray(),
     ])
 
-    const totalFiluxAmount  = fluxDocs.reduce((s: number, d: any) => s + Number(d.amount ?? 0), 0)
-    const totalFiluxCount   = fluxDocs.length
-    const totalXpayAmount   = xpayDocs.reduce((s: number, d: any) => s + Number(d.amount ?? 0), 0)
-    const totalXpayCount    = xpayDocs.length
+    let totalFiluxAmount  = fluxDocs.reduce((s: number, d: any) => s + Number(d.amount ?? 0), 0)
+    let totalFiluxCount   = fluxDocs.length
+    let totalXpayAmount   = xpayDocs.reduce((s: number, d: any) => s + Number(d.amount ?? 0), 0)
+    let totalXpayCount    = xpayDocs.length
 
     // 3. campaigntransactions — kampanya bonusları
     const campQuery: Record<string, unknown> = { status: "completed" }
@@ -199,10 +200,29 @@ export async function GET(req: NextRequest) {
       } catch (e) { console.warn("[balance-analysis] Neon error:", e) }
     }
 
+    // Manuel (görsel amaçlı) yatırım kayıtları — kullanıcı adı bazlı, henüz bonus/kampanya
+    // kaydı olmayan kullanıcıları da yakalamak için ayrıca çekilir ve _id'lerine çözümlenir.
+    const manualDepositLogs = await listAllManualBalanceLogs({
+      type: "deposit",
+      dateRange: hasDate ? { start: dateRange.$gte as Date | undefined, end: dateRange.$lte as Date | undefined } : undefined,
+    })
+    const manualUsernames = [...new Set(manualDepositLogs.map((l) => l.targetUsername))]
+    const manualUserDocs = manualUsernames.length > 0
+      ? await db.collection("users")
+          .find(
+            { username: { $in: manualUsernames } },
+            { projection: { _id: 1, username: 1 } }
+          )
+          .toArray()
+      : []
+    const usernameToUid: Record<string, string> = {}
+    manualUserDocs.forEach((u: any) => { usernameToUid[u.username] = String(u._id) })
+
     // 4. Tüm etkilenen user id'leri topla
     const allUserIds = new Set<string>()
     adjustments.forEach((a: any) => allUserIds.add(String(a.targetUser)))
     campaigns.forEach((c: any) => allUserIds.add(String(c.user)))
+    manualUserDocs.forEach((u: any) => allUserIds.add(String(u._id)))
 
     const objectIds = [...allUserIds].flatMap((id) => {
       try { return [new mongoose.Types.ObjectId(id)] } catch { return [] }
@@ -358,6 +378,24 @@ export async function GET(req: NextRequest) {
           status:    d.status ?? null,
           createdAt: d.createdAt instanceof Date ? d.createdAt.toISOString() : String(d.createdAt ?? ""),
         })
+      }
+    }
+
+    // Manuel (görsel amaçlı) Filux/xPayment yatırım kayıtlarını dahil et
+    // (manualDepositLogs ve usernameToUid yukarıda zaten çekildi)
+    for (const log of manualDepositLogs) {
+      const uid = usernameToUid[log.targetUsername]
+      if (!uid) continue
+      const u = ensureUser(uid)
+      const entry: DepositLog = { id: `manual_${log.id}`, amount: log.amount, status: "approved", createdAt: log.createdAt }
+      if (log.provider === "filux") {
+        u.filuxLogs.push(entry)
+        totalFiluxAmount += log.amount
+        totalFiluxCount  += 1
+      } else {
+        u.xpayLogs.push(entry)
+        totalXpayAmount += log.amount
+        totalXpayCount  += 1
       }
     }
 
