@@ -442,25 +442,9 @@ export default function PartnersPage() {
                     <td className="px-4 py-3 text-right font-semibold text-foreground">{partner.totalReferrals}</td>
                     <td className="px-4 py-3 text-right font-semibold text-primary">
                       ₺{partner.totalDeposits.toLocaleString("tr-TR")}
-                      {!!partner.manualDeposits && (
-                        <span
-                          className="ml-1.5 text-[10px] font-semibold uppercase tracking-wide text-warning bg-warning/10 rounded px-1 py-0.5"
-                          title={`Manuel eklenen: ₺${partner.manualDeposits.toLocaleString("tr-TR")}`}
-                        >
-                          Manuel
-                        </span>
-                      )}
                     </td>
                     <td className="px-4 py-3 text-right font-semibold text-destructive">
                       ₺{(partner.totalWithdrawals ?? 0).toLocaleString("tr-TR")}
-                      {!!partner.manualWithdrawals && (
-                        <span
-                          className="ml-1.5 text-[10px] font-semibold uppercase tracking-wide text-warning bg-warning/10 rounded px-1 py-0.5"
-                          title={`Manuel eklenen: ₺${partner.manualWithdrawals.toLocaleString("tr-TR")}`}
-                        >
-                          Manuel
-                        </span>
-                      )}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <span className="text-xs bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded-full font-medium">
