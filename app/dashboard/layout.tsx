@@ -193,6 +193,16 @@ const ADMIN_NAV = [
     ),
     superadminOnly: true,
   },
+  {
+    href: "/dashboard/manual-balance",
+    label: "Manuel Bakiye Ekle",
+    icon: (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v6m3-3H9m11 0a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+    ),
+    superadminOnly: true,
+  },
 ]
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {

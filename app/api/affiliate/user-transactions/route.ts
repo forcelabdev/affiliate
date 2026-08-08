@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/api-auth"
 import mongoose from "mongoose"
 import { connectDB } from "@/lib/connectDB"
+import { listManualBalanceLogsForUsers } from "@/lib/manual-balance"
 
 export async function GET(req: NextRequest) {
   const auth = await requireAuth(req)
@@ -88,8 +89,27 @@ export async function GET(req: NextRequest) {
     const meelDeposit    = meelTxns.filter((t: any) => t.type === "deposit"    && isApproved(t.status) && !isMeelBonus(t)).reduce((s: number, t: any) => s + (t.amount ?? 0), 0)
     const meelWithdrawal = meelTxns.filter((t: any) => ["withdraw","withdrawal"].includes(t.type) && isApproved(t.status)).reduce((s: number, t: any) => s + (t.amount ?? 0), 0)
 
-    const combinedTotalDeposit    = totalDeposit + meelDeposit
-    const combinedTotalWithdrawal = totalWithdrawal + meelWithdrawal
+    // Manuel (görsel amaçlı) yatırım/çekim kayıtlarını bu kullanıcı için çek
+    const manualLogs = await listManualBalanceLogsForUsers([user.username])
+    const manualDeposit    = manualLogs.filter((l) => l.type === "deposit").reduce((s, l) => s + l.amount, 0)
+    const manualWithdrawal = manualLogs.filter((l) => l.type === "withdrawal").reduce((s, l) => s + l.amount, 0)
+
+    const manualMapped = manualLogs.map((l) => ({
+      _id: `manual_${l.id}`,
+      amount: l.amount,
+      type: l.type,
+      providerName: `Manuel (${l.provider === "filux" ? "Filux" : "xPayment"})`,
+      status: "approved",
+      createdAt: l.createdAt,
+      approvedAt: l.createdAt,
+      oldBalance: l.oldTotal,
+      newBalance: l.newTotal,
+      currency: "TRY",
+      note: l.note,
+    }))
+
+    const combinedTotalDeposit    = totalDeposit + meelDeposit + manualDeposit
+    const combinedTotalWithdrawal = totalWithdrawal + meelWithdrawal + manualWithdrawal
 
     const meelMapped = meelTxns.map((t: any) => ({
       _id: String(t._id),
@@ -116,7 +136,7 @@ export async function GET(req: NextRequest) {
       summary: {
         totalDeposit:    combinedTotalDeposit,
         totalWithdrawal: combinedTotalWithdrawal,
-        txCount: transactions.length + meelMapped.length,
+        txCount: transactions.length + meelMapped.length + manualMapped.length,
       },
       transactions: [
         ...transactions.map((t: any) => ({
@@ -133,6 +153,7 @@ export async function GET(req: NextRequest) {
           note: t.metadata?.note || null,
         })),
         ...meelMapped,
+        ...manualMapped,
       ].sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
     })
   } catch (err) {

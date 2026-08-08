@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/api-auth"
 import mongoose from "mongoose"
 import { connectDB } from "@/lib/connectDB"
+import { getManualTotalsForUsers } from "@/lib/manual-balance"
 
 // ── Rate limiter ─────────────────────────────────────────────────────────────
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
@@ -147,14 +148,20 @@ export async function GET(req: NextRequest) {
         }
       } catch {}
 
+      // Manuel (görsel amaçlı) yatırım/çekim toplamlarını kullanıcı adına göre çek
+      const manualTotalsByUsername = await getManualTotalsForUsers(docs.map((u: any) => u.username))
+
       const referrals = docs.map((u: any) => {
         const uid  = String(u._id)
         const code = u.affiliates?.redeemedCode ?? "—"
+        const manualTotals = manualTotalsByUsername[u.username] ?? { deposit: 0, withdrawal: 0 }
         return {
           _id: uid, name: u.name, username: u.username, phone: u.phone,
           partnerName: codeToPartner[code] ?? code,
-          depositTotal:    depByUser[uid]  ?? 0,
-          withdrawalTotal: witByUser[uid]  ?? 0,
+          depositTotal:    (depByUser[uid]  ?? 0) + manualTotals.deposit,
+          withdrawalTotal: (witByUser[uid]  ?? 0) + manualTotals.withdrawal,
+          manualDepositTotal: manualTotals.deposit,
+          manualWithdrawalTotal: manualTotals.withdrawal,
           rivoBalance:     rivoByUser[uid] ?? 0,
           createdAt: u.createdAt,
         }
@@ -194,12 +201,18 @@ export async function GET(req: NextRequest) {
     const userIds = docs.map((u: any) => u._id)
     const { depByUser, witByUser, rivoByUser } = await getMonthlyStats(userIds, db)
 
+    // Manuel (görsel amaçlı) yatırım/çekim toplamlarını kullanıcı adına göre çek
+    const manualTotalsByUsername = await getManualTotalsForUsers(docs.map((u: any) => u.username))
+
     const referrals = docs.map((u: any) => {
       const uid = String(u._id)
+      const manualTotals = manualTotalsByUsername[u.username] ?? { deposit: 0, withdrawal: 0 }
       return {
         _id: uid, name: u.name, username: u.username, phone: u.phone,
-        depositTotal:    depByUser[uid]  ?? 0,
-        withdrawalTotal: witByUser[uid]  ?? 0,
+        depositTotal:    (depByUser[uid]  ?? 0) + manualTotals.deposit,
+        withdrawalTotal: (witByUser[uid]  ?? 0) + manualTotals.withdrawal,
+        manualDepositTotal: manualTotals.deposit,
+        manualWithdrawalTotal: manualTotals.withdrawal,
         rivoBalance:     rivoByUser[uid] ?? 0,
         redeemedCode: u.affiliates?.redeemedCode,
         referredAt:   u.affiliates?.referredAt ?? u.createdAt,

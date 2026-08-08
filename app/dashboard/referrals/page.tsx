@@ -13,6 +13,8 @@ interface Referral {
   referredAt?: string
   depositTotal?: number
   withdrawalTotal?: number
+  manualDepositTotal?: number
+  manualWithdrawalTotal?: number
   rivoBalance?: number
   redeemedCode?: string
   partnerName?: string
@@ -439,9 +441,25 @@ export default function ReferralsPage() {
                       <span className="font-semibold text-success">
                         ₺{(r.depositTotal ?? 0).toLocaleString("tr-TR")}
                       </span>
+                      {!!r.manualDepositTotal && (
+                        <span
+                          className="ml-1.5 text-[10px] font-semibold uppercase tracking-wide text-warning bg-warning/10 rounded px-1 py-0.5"
+                          title={`Manuel eklenen: ₺${r.manualDepositTotal.toLocaleString("tr-TR")}`}
+                        >
+                          Manuel
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3 hidden lg:table-cell text-destructive font-medium">
                       ₺{(r.withdrawalTotal ?? 0).toLocaleString("tr-TR")}
+                      {!!r.manualWithdrawalTotal && (
+                        <span
+                          className="ml-1.5 text-[10px] font-semibold uppercase tracking-wide text-warning bg-warning/10 rounded px-1 py-0.5"
+                          title={`Manuel eklenen: ₺${r.manualWithdrawalTotal.toLocaleString("tr-TR")}`}
+                        >
+                          Manuel
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3 hidden lg:table-cell">
                       <span className="font-semibold text-foreground">

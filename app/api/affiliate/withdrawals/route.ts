@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/api-auth"
 import mongoose from "mongoose"
 import { connectDB } from "@/lib/connectDB"
+import { listManualBalanceLogsForUsers } from "@/lib/manual-balance"
 
 export async function GET(req: NextRequest) {
   const auth = await requireAuth(req)
@@ -151,7 +152,26 @@ export async function GET(req: NextRequest) {
       status: w.status || "approved",
       source: w._source,
       createdAt: w.createdAt?.toISOString?.() ?? String(w.createdAt ?? ""),
-    })).sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1))
+    }))
+
+    // Manuel (görsel amaçlı) çekim kayıtlarını bu referral üyelerinin kullanıcı adlarıyla eşleştirip listeye ekle
+    const referralUsernames = userDocs.map((u: any) => u.username)
+    const manualLogs = await listManualBalanceLogsForUsers(referralUsernames, {
+      type: "withdrawal",
+      dateRange: { start: startDate, end: endDate },
+    })
+    for (const log of manualLogs) {
+      formatted.push({
+        _id: `manual_${log.id}`,
+        username: log.targetUsername,
+        amount: log.amount,
+        status: "approved",
+        source: "manual",
+        createdAt: log.createdAt,
+      })
+    }
+
+    formatted.sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1))
 
     return NextResponse.json({ success: true, refCode, data: formatted })
   } catch (err) {
