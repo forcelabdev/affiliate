@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/api-auth"
 import mongoose from "mongoose"
 import { connectDB } from "@/lib/connectDB"
-import { listManualBalanceLogsForUsers } from "@/lib/manual-balance"
 
 export async function GET(req: NextRequest) {
   const auth = await requireAuth(req)
@@ -104,20 +103,6 @@ export async function GET(req: NextRequest) {
     const map: Record<string, number> = {}
     for (const row of [...forcelabAgg, ...meeldevAgg]) {
       map[row._id] = (map[row._id] ?? 0) + row.deposits
-    }
-
-    // Manuel (görsel amaçlı) yatırım kayıtlarını günlük toplamlara dahil et
-    const referralUsernameDocs = await mongoose.connection.db!.collection("users")
-      .find({ _id: { $in: userIds } }, { projection: { username: 1 } })
-      .toArray()
-    const referralUsernames = referralUsernameDocs.map((u: any) => u.username).filter(Boolean)
-    const manualLogs = await listManualBalanceLogsForUsers(referralUsernames, {
-      type: "deposit",
-      dateRange: { start: from, end: now },
-    })
-    for (const log of manualLogs) {
-      const key = new Date(log.createdAt).toISOString().slice(0, 10)
-      map[key] = (map[key] ?? 0) + log.amount
     }
 
     const commissionRate = session.commissionRate ?? 10

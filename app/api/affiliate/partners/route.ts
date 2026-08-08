@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/api-auth"
 import mongoose from "mongoose"
 import { connectDB } from "@/lib/db"
-import { getManualTotalsForUsers } from "@/lib/manual-balance"
 
 export async function GET(req: NextRequest) {
   const auth = await requireAuth(req)
@@ -99,14 +98,6 @@ export async function GET(req: NextRequest) {
       { "affiliates.redeemedCode": { $exists: true, $ne: null } },
       { projection: { _id: 1, username: 1, "affiliates.redeemedCode": 1, "affiliates.referrerUsername": 1, "affiliates.referrer": 1 } }
     ).toArray()
-
-    // Manuel (görsel amaçlı) yatırım/çekim toplamlarını tüm referral üyeleri için tek seferde çek
-    const idToUsername: Record<string, string> = {}
-    for (const u of allMongoReferralUsers) idToUsername[String(u._id)] = u.username
-    const manualTotalsByUsername = await getManualTotalsForUsers(
-      allMongoReferralUsers.map((u: any) => u.username),
-      dateRange ? { start: dateRange.$gte, end: dateRange.$lte } : undefined
-    )
 
     // Build lookup maps
     const byRedeemedCode: Record<string, any[]> = {}
@@ -227,20 +218,6 @@ export async function GET(req: NextRequest) {
         totalWithdrawals = (forcelabWitAgg[0]?.total ?? 0) + (meeldevWitAgg[0]?.total ?? 0) + (fluxWitAgg[0]?.total ?? 0) + (xpayWitAgg[0]?.total ?? 0)
       }
 
-      // Bu partnerin referral üyeleri için manuel (görsel amaçlı) toplamları ekle
-      let manualDeposits = 0
-      let manualWithdrawals = 0
-      for (const uid of matchedIds) {
-        const uname = idToUsername[uid]
-        const manual = uname ? manualTotalsByUsername[uname] : undefined
-        if (manual) {
-          manualDeposits += manual.deposit
-          manualWithdrawals += manual.withdrawal
-        }
-      }
-      totalDeposits += manualDeposits
-      totalWithdrawals += manualWithdrawals
-
       const commissionRate = partner.commission_rate ?? 10
       const totalEarnings = Math.round(totalDeposits * (commissionRate / 100))
 
@@ -256,8 +233,6 @@ export async function GET(req: NextRequest) {
         totalDeposits,
         totalWithdrawals,
         totalEarnings,
-        manualDeposits,
-        manualWithdrawals,
         ticketEnabled: (partner as any).ticket_enabled ?? false,
         ticketThreshold: (partner as any).ticket_threshold ?? 1000,
         ticketStartDate: (partner as any).ticket_start_date ?? null,

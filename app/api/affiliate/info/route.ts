@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/api-auth"
 import mongoose from "mongoose"
 import { connectDB } from "@/lib/connectDB"
-import { getManualTotalsForUsers } from "@/lib/manual-balance"
 
 export async function GET(req: NextRequest) {
   const auth = await requireAuth(req)
@@ -172,15 +171,6 @@ export async function GET(req: NextRequest) {
       totalDeposits = forcelabTotal + meeldevTotal + fluxTotal + xpayTotal
       depositBreakdown = { forcelab: forcelabTotal, meeldev: meeldevTotal, filux: fluxTotal, xpayment: xpayTotal, manual: 0 }
     }
-
-    // Manuel (görsel amaçlı) yatırım toplamlarını genel bakış kartlarına dahil et
-    let manualDepositsTotal = 0
-    if (referralUsers.length > 0) {
-      const manualTotalsByUsername = await getManualTotalsForUsers(referralUsers.map((u: any) => u.username))
-      manualDepositsTotal = Object.values(manualTotalsByUsername).reduce((s, t) => s + t.deposit, 0)
-    }
-    totalDeposits += manualDepositsTotal
-    depositBreakdown.manual = manualDepositsTotal
 
     // Commission = partner's rate or default 10%
     const commissionRate = commissionRateOverride ?? session.commissionRate ?? 10
