@@ -430,7 +430,7 @@ export default function DashboardPage() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {[
               { label: "Forcelab",  value: stats.depositBreakdown.forcelab,           color: "text-foreground",  border: "border-border",        dot: "bg-muted-foreground", clickable: false },
-              { label: "Manuel",    value: stats.depositBreakdown.manual ?? 0,        color: "text-warning",     border: "border-warning/20",     dot: "bg-warning",          clickable: role === "superadmin" },
+              ...(role === "superadmin" ? [{ label: "Manuel", value: stats.depositBreakdown.manual ?? 0, color: "text-warning", border: "border-warning/20", dot: "bg-warning", clickable: true }] : []),
               { label: "Filux",     value: stats.depositBreakdown.filux,              color: "text-cyan-400",    border: "border-cyan-500/20",    dot: "bg-cyan-400",         clickable: false },
               { label: "xPayment",  value: stats.depositBreakdown.xpayment,           color: "text-violet-400",  border: "border-violet-500/20",  dot: "bg-violet-400",       clickable: false },
             ].map(item => (
