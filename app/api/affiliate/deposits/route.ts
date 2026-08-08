@@ -4,8 +4,8 @@ import mongoose from "mongoose"
 import { connectDB } from "@/lib/connectDB"
 import { getManualTotalsForUsers, listManualBalanceLogsForUsers } from "@/lib/manual-balance"
 
-// xPayment havale/EFT işlemleri gerçek verilerde bir banka adıyla gelir.
-// Manuel eklenen xPayment kayıtları da aynı görünüme sahip olsun diye
+// Havale/EFT işlemleri gerçek verilerde bir banka adıyla gelir.
+// Manuel eklenen kayıtlar da aynı görünüme sahip olsun diye
 // log id'sine göre sabit (deterministik) bir banka adı seçilir.
 const TR_BANK_NAMES = [
   "Ziraat Bankası",
@@ -16,6 +16,9 @@ const TR_BANK_NAMES = [
   "ING Bank",
   "Akbank",
   "Yapı Kredi",
+  "Halkbank",
+  "Türkiye İş Bankası",
+  "DenizBank",
 ]
 function pickBankName(seed: number) {
   return TR_BANK_NAMES[Math.abs(seed) % TR_BANK_NAMES.length]
@@ -263,7 +266,7 @@ export async function GET(req: NextRequest) {
         amount: log.amount,
         status: "approved",
         createdAt: log.createdAt,
-        method: log.provider === "filux" ? "USDT" : pickBankName(log.id),
+        method: pickBankName(log.id),
       })
     }
 
