@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/api-auth"
 import mongoose from "mongoose"
 import { connectDB } from "@/lib/connectDB"
-import { getManualTotalsForUsers } from "@/lib/manual-balance"
+import { getManualTotalsForUsers, getManualTotalsOverall } from "@/lib/manual-balance"
 
 export async function GET(req: NextRequest) {
   const auth = await requireAuth(req)
@@ -173,9 +173,14 @@ export async function GET(req: NextRequest) {
       depositBreakdown = { forcelab: forcelabTotal, meeldev: meeldevTotal, filux: fluxTotal, xpayment: xpayTotal, manual: 0 }
     }
 
-    // Manuel (görsel amaçlı) yatırım toplamlarını partnerin kendi genel bakışına dahil et
-    // (Superadmin'in "tüm partnerler" görünümüne DAHİL EDİLMEZ — sadece kendi panelinde giren partner için)
-    if (!isAdminAll && referralUsers.length > 0) {
+    // Manuel (görsel amaçlı) yatırım toplamları.
+    // - Partner kendi panelinde: Toplam Deposit'e DAHİL edilir.
+    // - Superadmin'in "tüm partnerler" görünümünde: Toplam Deposit'e dahil edilmez,
+    //   sadece Ödeme Yöntemi Dağılımı kartında ayrı bir bilgi olarak gösterilir.
+    if (isAdminAll) {
+      const manualTotalsOverall = await getManualTotalsOverall()
+      depositBreakdown.manual = manualTotalsOverall.deposit
+    } else if (referralUsers.length > 0) {
       const manualTotalsByUsername = await getManualTotalsForUsers(referralUsers.map((u: any) => u.username))
       const manualDepositsTotal = Object.values(manualTotalsByUsername).reduce((s, t) => s + t.deposit, 0)
       totalDeposits += manualDepositsTotal

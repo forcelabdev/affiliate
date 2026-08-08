@@ -37,6 +37,17 @@ interface ChartDataPoint {
   earnings: number
 }
 
+interface ManualLog {
+  id: number
+  targetUsername: string
+  type: "deposit" | "withdrawal"
+  provider: "filux" | "xpayment"
+  amount: number
+  note: string | null
+  addedBy: string
+  createdAt: string
+}
+
 function toSafeArray<T>(val: unknown): T[] {
   return Array.isArray(val) ? (val as T[]) : []
 }
@@ -130,6 +141,12 @@ export default function DashboardPage() {
     result: null as { success: boolean; message: string } | null,
   })
 
+  // Manuel İşlem Geçmişi Modal
+  const [manualHistoryOpen, setManualHistoryOpen] = useState(false)
+  const [manualHistory, setManualHistory] = useState<ManualLog[]>([])
+  const [manualHistoryTotal, setManualHistoryTotal] = useState(0)
+  const [manualHistoryLoading, setManualHistoryLoading] = useState(false)
+
   const lastFive = toSafeArray<LastFiveUser>(lastFiveRaw)
 
   useEffect(() => {
@@ -218,6 +235,26 @@ export default function DashboardPage() {
       setLoading(false)
     }
   }
+
+  async function fetchManualHistory() {
+    setManualHistoryLoading(true)
+    try {
+      const res = await fetch("/api/affiliate/manual-balance?limit=200", { headers: { "x-auth-token": token } })
+      const data = await res.json()
+      if (data.success) {
+        setManualHistory(Array.isArray(data.logs) ? data.logs : [])
+        setManualHistoryTotal(data.total ?? 0)
+      }
+    } catch {
+      // leave defaults
+    } finally {
+      setManualHistoryLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (manualHistoryOpen && token) fetchManualHistory()
+  }, [manualHistoryOpen, token])
 
   function copyRefLink() {
     const link = refLink || `https://bizzocazino.com/register?a=${refCode || userId}`
@@ -392,15 +429,29 @@ export default function DashboardPage() {
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Ödeme Yöntemi Dağılımı — Tüm Zamanlar</p>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {[
-              { label: "Forcelab",  value: stats.depositBreakdown.forcelab,  color: "text-foreground",   border: "border-border",          dot: "bg-muted-foreground" },
-              { label: "Meeldev",   value: stats.depositBreakdown.meeldev,   color: "text-foreground",   border: "border-border",          dot: "bg-muted-foreground" },
-              { label: "Filux",     value: stats.depositBreakdown.filux,     color: "text-cyan-400",     border: "border-cyan-500/20",     dot: "bg-cyan-400" },
-              { label: "xPayment",  value: stats.depositBreakdown.xpayment,  color: "text-violet-400",   border: "border-violet-500/20",   dot: "bg-violet-400" },
+              { label: "Forcelab",  value: stats.depositBreakdown.forcelab,           color: "text-foreground",  border: "border-border",        dot: "bg-muted-foreground", clickable: false },
+              { label: "Manuel",    value: stats.depositBreakdown.manual ?? 0,        color: "text-warning",     border: "border-warning/20",     dot: "bg-warning",          clickable: role === "superadmin" },
+              { label: "Filux",     value: stats.depositBreakdown.filux,              color: "text-cyan-400",    border: "border-cyan-500/20",    dot: "bg-cyan-400",         clickable: false },
+              { label: "xPayment",  value: stats.depositBreakdown.xpayment,           color: "text-violet-400",  border: "border-violet-500/20",  dot: "bg-violet-400",       clickable: false },
             ].map(item => (
-              <div key={item.label} className={`bg-card border ${item.border} rounded-xl p-4`}>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${item.dot}`}/>
-                  <p className="text-xs text-muted-foreground font-medium">{item.label}</p>
+              <div
+                key={item.label}
+                role={item.clickable ? "button" : undefined}
+                tabIndex={item.clickable ? 0 : undefined}
+                onClick={item.clickable ? () => setManualHistoryOpen(true) : undefined}
+                onKeyDown={item.clickable ? (e) => { if (e.key === "Enter" || e.key === " ") setManualHistoryOpen(true) } : undefined}
+                className={`bg-card border ${item.border} rounded-xl p-4 ${item.clickable ? "cursor-pointer hover:border-warning/40 transition-colors" : ""}`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${item.dot}`}/>
+                    <p className="text-xs text-muted-foreground font-medium">{item.label}</p>
+                  </div>
+                  {item.clickable && (
+                    <svg className="w-3.5 h-3.5 text-muted-foreground/50" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/>
+                    </svg>
+                  )}
                 </div>
                 <p className={`text-lg font-bold ${item.color}`}>
                   ₺{item.value.toLocaleString("tr-TR", { maximumFractionDigits: 0 })}
@@ -593,6 +644,86 @@ export default function DashboardPage() {
                   Kapat
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manuel İşlem Geçmişi Modal */}
+      {manualHistoryOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setManualHistoryOpen(false)}/>
+          <div className="relative bg-card border border-border rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-warning/10 flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-warning/20 flex items-center justify-center">
+                  <svg className="w-5 h-5 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                  </svg>
+                </div>
+                <div>
+                  <p className="font-bold text-foreground">Manuel İşlem Geçmişi</p>
+                  <p className="text-xs text-muted-foreground">Toplam {manualHistoryTotal} kayıt</p>
+                </div>
+              </div>
+              <button onClick={() => setManualHistoryOpen(false)} className="p-1.5 rounded-lg hover:bg-secondary transition-colors">
+                <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto">
+              {manualHistoryLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <svg className="w-6 h-6 animate-spin text-warning" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                  </svg>
+                </div>
+              ) : manualHistory.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center px-4">
+                  <svg className="w-8 h-8 text-muted-foreground mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                  </svg>
+                  <p className="text-xs text-muted-foreground">Henüz manuel işlem kaydı yok</p>
+                </div>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-card">
+                    <tr className="border-b border-border text-left text-xs text-muted-foreground uppercase tracking-wider">
+                      <th className="px-5 py-2.5 font-semibold">Kullanıcı</th>
+                      <th className="px-5 py-2.5 font-semibold">Tip</th>
+                      <th className="px-5 py-2.5 font-semibold">Sağlayıcı</th>
+                      <th className="px-5 py-2.5 font-semibold text-right">Tutar</th>
+                      <th className="px-5 py-2.5 font-semibold">Ekleyen</th>
+                      <th className="px-5 py-2.5 font-semibold">Tarih</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {manualHistory.map(log => (
+                      <tr key={log.id} className="border-b border-border last:border-0 hover:bg-secondary/40 transition-colors">
+                        <td className="px-5 py-3 font-medium text-foreground">{log.targetUsername}</td>
+                        <td className="px-5 py-3">
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                            log.type === "deposit" ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"
+                          }`}>
+                            {log.type === "deposit" ? "Yatırım" : "Çekim"}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3 text-muted-foreground text-xs uppercase">{log.provider}</td>
+                        <td className={`px-5 py-3 text-right font-semibold ${log.type === "deposit" ? "text-success" : "text-destructive"}`}>
+                          ₺{log.amount.toLocaleString("tr-TR")}
+                        </td>
+                        <td className="px-5 py-3 text-muted-foreground text-xs">{log.addedBy}</td>
+                        <td className="px-5 py-3 text-muted-foreground text-xs whitespace-nowrap">
+                          {new Date(log.createdAt).toLocaleString("tr-TR")}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
         </div>
