@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/api-auth"
 import mongoose from "mongoose"
 import { connectDB } from "@/lib/connectDB"
+import { getManualTotalsForUsers } from "@/lib/manual-balance"
 
 export async function GET(req: NextRequest) {
   const auth = await requireAuth(req)
@@ -225,6 +226,9 @@ export async function GET(req: NextRequest) {
       } catch (e) { console.warn("[deposits] codeToPartner Neon error:", e) }
     }
 
+    // Manuel (görsel amaçlı) yatırım/çekim toplamlarını kullanıcı adına göre çek ve toplamlara ekle
+    const manualTotalsByUsername = await getManualTotalsForUsers(userDocs.map((u: any) => u.username))
+
     const referrals = userDocs.map((u: any) => {
       const uid = String(u._id)
       const redeemedCode = u.affiliates?.redeemedCode
@@ -233,10 +237,13 @@ export async function GET(req: NextRequest) {
       const latestTx = userTxs.length > 0
         ? userTxs.reduce((a, b) => (a.createdAt > b.createdAt ? a : b))
         : null
+      const manualTotals = manualTotalsByUsername[u.username] ?? { deposit: 0, withdrawal: 0 }
       return {
         _id: uid, name: u.name, username: u.username,
-        depositTotal: depositByUser[uid] ?? 0,
-        withdrawalTotal: withdrawalByUser[uid] ?? 0,
+        depositTotal: (depositByUser[uid] ?? 0) + manualTotals.deposit,
+        withdrawalTotal: (withdrawalByUser[uid] ?? 0) + manualTotals.withdrawal,
+        manualDepositTotal: manualTotals.deposit,
+        manualWithdrawalTotal: manualTotals.withdrawal,
         redeemedCode,
         partnerName: redeemedCode ? (codeToPartner[redeemedCode] ?? redeemedCode) : null,
         referredAt: u.affiliates?.referredAt ?? u.createdAt,

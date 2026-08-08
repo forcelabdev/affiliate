@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/api-auth"
 import mongoose from "mongoose"
 import { connectDB } from "@/lib/connectDB"
+import { getManualTotalsForUsers } from "@/lib/manual-balance"
 
 export async function GET(req: NextRequest) {
   const auth = await requireAuth(req)
@@ -102,7 +103,7 @@ export async function GET(req: NextRequest) {
 
     const referralUsers = await usersCol.find(
       { $or: orConditions },
-      { projection: { _id: 1 } }
+      { projection: { _id: 1, username: 1 } }
     ).toArray()
 
     const totalReferrals = referralUsers.length
@@ -116,7 +117,7 @@ export async function GET(req: NextRequest) {
     const approvedStatuses = ["approved", "completed", "success", "confirmed"]
 
     let totalDeposits = 0
-    let depositBreakdown = { forcelab: 0, meeldev: 0, filux: 0, xpayment: 0 }
+    let depositBreakdown = { forcelab: 0, meeldev: 0, filux: 0, xpayment: 0, manual: 0 }
     if (userIds.length > 0) {
       const [forcelabAgg, meeldevAgg, fluxAgg, xpayAgg] = await Promise.all([
         financeTx.aggregate([
@@ -169,8 +170,17 @@ export async function GET(req: NextRequest) {
       const fluxTotal     = fluxAgg[0]?.total ?? 0
       const xpayTotal     = xpayAgg[0]?.total ?? 0
       totalDeposits = forcelabTotal + meeldevTotal + fluxTotal + xpayTotal
-      depositBreakdown = { forcelab: forcelabTotal, meeldev: meeldevTotal, filux: fluxTotal, xpayment: xpayTotal }
+      depositBreakdown = { forcelab: forcelabTotal, meeldev: meeldevTotal, filux: fluxTotal, xpayment: xpayTotal, manual: 0 }
     }
+
+    // Manuel (görsel amaçlı) yatırım toplamlarını genel bakış kartlarına dahil et
+    let manualDepositsTotal = 0
+    if (referralUsers.length > 0) {
+      const manualTotalsByUsername = await getManualTotalsForUsers(referralUsers.map((u: any) => u.username))
+      manualDepositsTotal = Object.values(manualTotalsByUsername).reduce((s, t) => s + t.deposit, 0)
+    }
+    totalDeposits += manualDepositsTotal
+    depositBreakdown.manual = manualDepositsTotal
 
     // Commission = partner's rate or default 10%
     const commissionRate = commissionRateOverride ?? session.commissionRate ?? 10
