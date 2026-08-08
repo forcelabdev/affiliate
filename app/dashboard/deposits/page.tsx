@@ -13,6 +13,7 @@ interface DepositRecord {
   createdAt?: string
   username?: string
   partnerName?: string | null
+  isManual?: boolean
 }
 
 interface WithdrawalRecord {
@@ -172,6 +173,7 @@ export default function DepositsPage() {
             createdAt: d.createdAt,
             username: r.username,
             partnerName: r.partnerName,
+            isManual: d.isManual,
           }))
         } else if (r.depositTotal && r.depositTotal > 0) {
           flat.push({
@@ -569,6 +571,14 @@ export default function DepositsPage() {
                                 <span className={`font-semibold text-sm ${d.status === "approved" ? "text-success" : d.status === "rejected" ? "text-destructive" : "text-warning"}`}>
                                   ₺{d.amount.toLocaleString("tr-TR")}
                                 </span>
+                                {d.isManual && role === "superadmin" && (
+                                  <span
+                                    className="ml-1.5 inline-flex items-center text-[10px] font-semibold uppercase tracking-wide text-warning bg-warning/10 rounded px-1 py-0.5"
+                                    title="Manuel eklenen kayıt"
+                                  >
+                                    Manuel
+                                  </span>
+                                )}
                               </td>
                               <td className="px-4 py-3 hidden sm:table-cell text-muted-foreground text-xs">
                                 {d.method ? d.method.replace(/-/g, " ") : "—"}
