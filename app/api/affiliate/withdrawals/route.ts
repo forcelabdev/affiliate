@@ -166,7 +166,7 @@ export async function GET(req: NextRequest) {
         username: log.targetUsername,
         amount: log.amount,
         status: "approved",
-        source: "manual",
+        source: log.provider === "filux" ? "fluxkripto" : "xpayment",
         createdAt: log.createdAt,
       })
     }
