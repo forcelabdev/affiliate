@@ -204,7 +204,7 @@ export async function GET(req: NextRequest) {
     // Group by userId — tüm kaynaklardan gelen tutarları topla
     const depositByUser: Record<string, number> = {}
     const withdrawalByUser: Record<string, number> = {}
-    const txByUser: Record<string, { txId: string; source: string; amount: number; status: string; createdAt: string; method?: string }[]> = {}
+    const txByUser: Record<string, { txId: string; source: string; amount: number; status: string; createdAt: string; method?: string; isManual?: boolean }[]> = {}
 
     const addDeposit = (t: any, source: string, method?: string) => {
       const uid = String(t.user)
@@ -267,6 +267,7 @@ export async function GET(req: NextRequest) {
         status: "approved",
         createdAt: log.createdAt,
         method: pickBankName(log.id),
+        isManual: true,
       })
     }
 
