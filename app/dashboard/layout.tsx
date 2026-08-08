@@ -269,7 +269,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 h-screen z-30 w-60 bg-sidebar border-r border-sidebar-border flex flex-col transition-transform duration-200 lg:translate-x-0 lg:static lg:h-auto lg:self-stretch lg:z-auto ${
+        className={`fixed top-0 left-0 h-screen z-30 w-60 bg-sidebar border-r border-sidebar-border flex flex-col min-h-0 transition-transform duration-200 lg:translate-x-0 lg:static lg:h-screen lg:self-stretch lg:z-auto ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -311,7 +311,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         )}
 
         {/* Nav */}
-        <nav className="flex-1 px-3 py-4 flex flex-col gap-0.5">
+        <nav className="flex-1 min-h-0 overflow-y-auto px-3 py-4 flex flex-col gap-0.5">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-2">
             Menü
           </p>
