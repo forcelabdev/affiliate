@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/api-auth"
 import mongoose from "mongoose"
 import { connectDB } from "@/lib/connectDB"
+import { getManualTotalsForUsers, getManualTotalsOverall } from "@/lib/manual-balance"
 
 export async function GET(req: NextRequest) {
   const auth = await requireAuth(req)
@@ -170,6 +171,20 @@ export async function GET(req: NextRequest) {
       const xpayTotal     = xpayAgg[0]?.total ?? 0
       totalDeposits = forcelabTotal + meeldevTotal + fluxTotal + xpayTotal
       depositBreakdown = { forcelab: forcelabTotal, meeldev: meeldevTotal, filux: fluxTotal, xpayment: xpayTotal, manual: 0 }
+    }
+
+    // Manuel (görsel amaçlı) yatırım toplamları — Genel Bakış'taki TÜM istatistiklere
+    // (Toplam Deposit, Komisyon, Ödeme Yöntemi Dağılımı) dahil edilir.
+    // Sadece Bakiye Analizi sayfası (ayrı bir route/endpoint) buna dahil değildir.
+    if (isAdminAll) {
+      const manualTotalsOverall = await getManualTotalsOverall()
+      totalDeposits += manualTotalsOverall.deposit
+      depositBreakdown.manual = manualTotalsOverall.deposit
+    } else if (referralUsers.length > 0) {
+      const manualTotalsByUsername = await getManualTotalsForUsers(referralUsers.map((u: any) => u.username))
+      const manualDepositsTotal = Object.values(manualTotalsByUsername).reduce((s, t) => s + t.deposit, 0)
+      totalDeposits += manualDepositsTotal
+      depositBreakdown.manual = manualDepositsTotal
     }
 
     // Commission = partner's rate or default 10%

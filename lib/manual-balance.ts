@@ -146,6 +146,49 @@ export async function getManualTotalsOverall(
   }
 }
 
+/** Manuel deposit toplamlarını gün bazında gruplar — Deposit Grafiği gibi zaman serisi
+ *  gösterimlerinde kullanılır. usernames boş bırakılırsa (superadmin genel bakış) tüm
+ *  kullanıcıların manuel kayıtları dahil edilir.
+ */
+export async function getManualDailyDeposits(
+  dateRange: { start: Date; end: Date },
+  usernames?: string[]
+): Promise<Record<string, number>> {
+  const sql = getSql()
+  const result: Record<string, number> = {}
+  if (!sql) return result
+
+  const uniqueUsernames = usernames ? Array.from(new Set(usernames.filter(Boolean))) : null
+
+  try {
+    const rows = uniqueUsernames
+      ? await sql`
+          SELECT to_char(created_at, 'YYYY-MM-DD') as day, COALESCE(SUM(amount), 0) as total
+          FROM manual_balance_logs
+          WHERE type = 'deposit'
+            AND target_username = ANY(${uniqueUsernames})
+            AND created_at >= ${dateRange.start}
+            AND created_at <= ${dateRange.end}
+          GROUP BY day
+        `
+      : await sql`
+          SELECT to_char(created_at, 'YYYY-MM-DD') as day, COALESCE(SUM(amount), 0) as total
+          FROM manual_balance_logs
+          WHERE type = 'deposit'
+            AND created_at >= ${dateRange.start}
+            AND created_at <= ${dateRange.end}
+          GROUP BY day
+        `
+    for (const row of rows as any[]) {
+      result[row.day] = Number(row.total ?? 0)
+    }
+    return result
+  } catch (err) {
+    console.warn("[manual-balance] getManualDailyDeposits error:", err)
+    return result
+  }
+}
+
 /** Yeni manuel kayıt ekler. old_total/new_total, o kullanıcının o tip (deposit/withdrawal)
  *  için mevcut toplamı üzerinden otomatik hesaplanır.
  */
