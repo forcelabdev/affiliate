@@ -38,6 +38,7 @@ export async function GET(req: NextRequest) {
 
     let orConditions: Record<string, unknown>[] = []
     let commissionRateOverride: number | null = null
+    let commissionTypeOverride: string | null = null
 
     if (isAdminAll) {
       // Superadmin no refCode: aggregate ALL referral users directly from MongoDB
@@ -72,10 +73,11 @@ export async function GET(req: NextRequest) {
         try {
           const { neon } = await import("@neondatabase/serverless")
           const sql = neon(databaseUrl)
-          const partners = await sql`SELECT username, commission_rate FROM affiliate_users WHERE ref_code = ${refCode} OR username = ${session.username}`
+          const partners = await sql`SELECT username, commission_rate, commission_type FROM affiliate_users WHERE ref_code = ${refCode} OR username = ${session.username}`
           if (partners && partners.length > 0) {
             partnerUsername = partners[0].username
             commissionRateOverride = partners[0].commission_rate ?? null
+            commissionTypeOverride = partners[0].commission_type ?? null
           }
         } catch (e) { console.warn("[affiliate/info] Neon error:", e) }
       }
@@ -117,9 +119,10 @@ export async function GET(req: NextRequest) {
     const approvedStatuses = ["approved", "completed", "success", "confirmed"]
 
     let totalDeposits = 0
+    let totalWithdrawals = 0
     let depositBreakdown = { forcelab: 0, meeldev: 0, filux: 0, xpayment: 0, manual: 0 }
     if (userIds.length > 0) {
-      const [forcelabAgg, meeldevAgg, fluxAgg, xpayAgg] = await Promise.all([
+      const [forcelabAgg, meeldevAgg, fluxAgg, xpayAgg, forcelabWAgg, meeldevWAgg, fluxWAgg, xpayWAgg] = await Promise.all([
         financeTx.aggregate([
           {
             $match: {
@@ -164,6 +167,46 @@ export async function GET(req: NextRequest) {
           },
           { $group: { _id: null, total: { $sum: "$amount" } } },
         ]).toArray(),
+        financeTx.aggregate([
+          {
+            $match: {
+              user: { $in: userIds },
+              providerType: { $in: ["withdraw", "withdrawal"] },
+              status: { $in: approvedStatuses },
+            },
+          },
+          { $group: { _id: null, total: { $sum: "$amount" } } },
+        ]).toArray(),
+        meeldevTx.aggregate([
+          {
+            $match: {
+              user: { $in: userIds },
+              type: { $in: ["withdraw", "withdrawal"] },
+              status: { $in: approvedStatuses },
+            },
+          },
+          { $group: { _id: null, total: { $sum: "$amount" } } },
+        ]).toArray(),
+        fluxTx.aggregate([
+          {
+            $match: {
+              user: { $in: userIds },
+              type: { $in: ["withdraw", "withdrawal"] },
+              status: { $in: approvedStatuses },
+            },
+          },
+          { $group: { _id: null, total: { $sum: "$amount" } } },
+        ]).toArray(),
+        xpayTx.aggregate([
+          {
+            $match: {
+              user: { $in: userIds },
+              type: { $in: ["withdraw", "withdrawal"] },
+              status: { $in: approvedStatuses },
+            },
+          },
+          { $group: { _id: null, total: { $sum: "$amount" } } },
+        ]).toArray(),
       ])
       const forcelabTotal = forcelabAgg[0]?.total ?? 0
       const meeldevTotal  = meeldevAgg[0]?.total ?? 0
@@ -171,6 +214,12 @@ export async function GET(req: NextRequest) {
       const xpayTotal     = xpayAgg[0]?.total ?? 0
       totalDeposits = forcelabTotal + meeldevTotal + fluxTotal + xpayTotal
       depositBreakdown = { forcelab: forcelabTotal, meeldev: meeldevTotal, filux: fluxTotal, xpayment: xpayTotal, manual: 0 }
+
+      const forcelabWTotal = forcelabWAgg[0]?.total ?? 0
+      const meeldevWTotal  = meeldevWAgg[0]?.total ?? 0
+      const fluxWTotal     = fluxWAgg[0]?.total ?? 0
+      const xpayWTotal     = xpayWAgg[0]?.total ?? 0
+      totalWithdrawals = forcelabWTotal + meeldevWTotal + fluxWTotal + xpayWTotal
     }
 
     // Manuel (görsel amaçlı) yatırım toplamları — Genel Bakış'taki TÜM istatistiklere
@@ -180,16 +229,23 @@ export async function GET(req: NextRequest) {
       const manualTotalsOverall = await getManualTotalsOverall()
       totalDeposits += manualTotalsOverall.deposit
       depositBreakdown.manual = manualTotalsOverall.deposit
+      totalWithdrawals += manualTotalsOverall.withdrawal
     } else if (referralUsers.length > 0) {
       const manualTotalsByUsername = await getManualTotalsForUsers(referralUsers.map((u: any) => u.username))
       const manualDepositsTotal = Object.values(manualTotalsByUsername).reduce((s, t) => s + t.deposit, 0)
+      const manualWithdrawalsTotal = Object.values(manualTotalsByUsername).reduce((s, t) => s + t.withdrawal, 0)
       totalDeposits += manualDepositsTotal
       depositBreakdown.manual = manualDepositsTotal
+      totalWithdrawals += manualWithdrawalsTotal
     }
 
-    // Commission = partner's rate or default 10%
+    // Commission = partner's rate or default 10%.
+    // "deposit" tipi: sadece toplam yatırım üzerinden hesaplanır.
+    // "net" tipi: yatırım - çekim (net kazanç) üzerinden hesaplanır.
     const commissionRate = commissionRateOverride ?? session.commissionRate ?? 10
-    const commission = Math.round(totalDeposits * (commissionRate / 100))
+    const commissionType = commissionTypeOverride ?? session.commissionType ?? "deposit"
+    const commissionBase = commissionType === "net" ? Math.max(totalDeposits - totalWithdrawals, 0) : totalDeposits
+    const commission = Math.round(commissionBase * (commissionRate / 100))
 
     return NextResponse.json({
       success: true,
@@ -199,9 +255,11 @@ export async function GET(req: NextRequest) {
       stats: {
         totalReferrals,
         totalDeposits,
+        totalWithdrawals,
         totalEarnings: commission,
         pendingEarnings: commission,
         commissionRate,
+        commissionType,
         depositBreakdown,
       },
     })

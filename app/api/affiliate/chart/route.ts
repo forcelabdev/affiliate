@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/api-auth"
 import mongoose from "mongoose"
 import { connectDB } from "@/lib/connectDB"
-import { getManualDailyDeposits } from "@/lib/manual-balance"
+import { getManualDailyDeposits, getManualDailyTotals } from "@/lib/manual-balance"
 
 export async function GET(req: NextRequest) {
   const auth = await requireAuth(req)
@@ -25,6 +25,8 @@ export async function GET(req: NextRequest) {
     const databaseUrl = process.env.DATABASE_URL
 
     let orConditions: Record<string, unknown>[] = []
+    let commissionRateOverride: number | null = null
+    let commissionTypeOverride: string | null = null
 
     if (isAdminAll) {
       // Use MongoDB's own referral fields — do NOT filter through Neon ref_codes
@@ -42,8 +44,12 @@ export async function GET(req: NextRequest) {
         try {
           const { neon } = await import("@neondatabase/serverless")
           const sql = neon(databaseUrl)
-          const rows = await sql`SELECT username FROM affiliate_users WHERE ref_code = ${refCode} OR username = ${session.username}`
-          if (rows?.length > 0) partnerUsername = rows[0].username
+          const rows = await sql`SELECT username, commission_rate, commission_type FROM affiliate_users WHERE ref_code = ${refCode} OR username = ${session.username}`
+          if (rows?.length > 0) {
+            partnerUsername = rows[0].username
+            commissionRateOverride = rows[0].commission_rate ?? null
+            commissionTypeOverride = rows[0].commission_type ?? null
+          }
         } catch (e) { console.warn("[chart] Neon error:", e) }
       }
       const partner = await usersCol.findOne(
@@ -89,8 +95,8 @@ export async function GET(req: NextRequest) {
       providerSlug: { $not: { $regex: /bonus/i } },
     }
 
-    // Her iki kaynaktan deposit aggregate (bonus hariç)
-    const [forcelabAgg, meeldevAgg] = await Promise.all([
+    // Her iki kaynaktan deposit + withdrawal aggregate (bonus hariç)
+    const [forcelabAgg, meeldevAgg, forcelabWAgg, meeldevWAgg] = await Promise.all([
       financeTx.aggregate([
         { $match: { user: { $in: userIds }, providerType: "deposit", status: { $in: approvedStatuses }, createdAt: { $gte: from }, ...notBonusFilter } },
         { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }, deposits: { $sum: "$amount" } } },
@@ -99,6 +105,14 @@ export async function GET(req: NextRequest) {
         { $match: { user: { $in: userIds }, type: "deposit", status: { $in: approvedStatuses }, createdAt: { $gte: from }, ...notBonusFilter } },
         { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }, deposits: { $sum: "$amount" } } },
       ]).toArray(),
+      financeTx.aggregate([
+        { $match: { user: { $in: userIds }, providerType: { $in: ["withdraw", "withdrawal"] }, status: { $in: approvedStatuses }, createdAt: { $gte: from } } },
+        { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }, withdrawals: { $sum: "$amount" } } },
+      ]).toArray(),
+      meeldevTx.aggregate([
+        { $match: { user: { $in: userIds }, type: { $in: ["withdraw", "withdrawal"] }, status: { $in: approvedStatuses }, createdAt: { $gte: from } } },
+        { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }, withdrawals: { $sum: "$amount" } } },
+      ]).toArray(),
     ])
 
     // Günlük toplamları birleştir
@@ -106,17 +120,25 @@ export async function GET(req: NextRequest) {
     for (const row of [...forcelabAgg, ...meeldevAgg]) {
       map[row._id] = (map[row._id] ?? 0) + row.deposits
     }
+    const withdrawalMap: Record<string, number> = {}
+    for (const row of [...forcelabWAgg, ...meeldevWAgg]) {
+      withdrawalMap[row._id] = (withdrawalMap[row._id] ?? 0) + row.withdrawals
+    }
 
-    // Manuel (görsel amaçlı) yatırımları da grafiğe dahil et
-    const manualDaily = await getManualDailyDeposits(
-      { start: from, end: now },
-      isAdminAll ? undefined : referralUsernames
-    )
+    // Manuel (görsel amaçlı) yatırım/çekimleri de grafiğe dahil et
+    const [manualDaily, manualDailyWithdrawals] = await Promise.all([
+      getManualDailyDeposits({ start: from, end: now }, isAdminAll ? undefined : referralUsernames),
+      getManualDailyTotals("withdrawal", { start: from, end: now }, isAdminAll ? undefined : referralUsernames),
+    ])
     for (const [day, amount] of Object.entries(manualDaily)) {
       map[day] = (map[day] ?? 0) + amount
     }
+    for (const [day, amount] of Object.entries(manualDailyWithdrawals)) {
+      withdrawalMap[day] = (withdrawalMap[day] ?? 0) + amount
+    }
 
-    const commissionRate = session.commissionRate ?? 10
+    const commissionRate = commissionRateOverride ?? session.commissionRate ?? 10
+    const commissionType = commissionTypeOverride ?? session.commissionType ?? "deposit"
     const data: { date: string; deposits: number; earnings: number }[] = []
     for (let i = 0; i < 30; i++) {
       const d = new Date(from)
@@ -124,7 +146,9 @@ export async function GET(req: NextRequest) {
       const key = d.toISOString().slice(0, 10)
       const label = d.toLocaleDateString("tr-TR", { day: "numeric", month: "short" })
       const deposits = map[key] ?? 0
-      data.push({ date: label, deposits, earnings: +(deposits * (commissionRate / 100)).toFixed(2) })
+      const withdrawals = withdrawalMap[key] ?? 0
+      const commissionBase = commissionType === "net" ? Math.max(deposits - withdrawals, 0) : deposits
+      data.push({ date: label, deposits, earnings: +(commissionBase * (commissionRate / 100)).toFixed(2) })
     }
 
     return NextResponse.json({ success: true, data })

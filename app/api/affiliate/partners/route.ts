@@ -238,7 +238,9 @@ export async function GET(req: NextRequest) {
       }
 
       const commissionRate = partner.commission_rate ?? 10
-      const totalEarnings = Math.round(totalDeposits * (commissionRate / 100))
+      const commissionType = partner.commission_type || "deposit"
+      const commissionBase = commissionType === "net" ? Math.max(totalDeposits - totalWithdrawals, 0) : totalDeposits
+      const totalEarnings = Math.round(commissionBase * (commissionRate / 100))
 
       return {
         neonId: (partner as any).id,
@@ -247,7 +249,7 @@ export async function GET(req: NextRequest) {
         refCode: code,
         shortLink: partner.short_link || null,
         commissionRate,
-        commissionType: partner.commission_type || "deposit",
+        commissionType,
         totalReferrals,
         totalDeposits,
         totalWithdrawals,
