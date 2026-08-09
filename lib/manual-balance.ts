@@ -154,6 +154,15 @@ export async function getManualDailyDeposits(
   dateRange: { start: Date; end: Date },
   usernames?: string[]
 ): Promise<Record<string, number>> {
+  return getManualDailyTotals("deposit", dateRange, usernames)
+}
+
+/** Belirtilen tip (deposit/withdrawal) için günlük manuel toplamları getirir. */
+export async function getManualDailyTotals(
+  type: ManualBalanceType,
+  dateRange: { start: Date; end: Date },
+  usernames?: string[]
+): Promise<Record<string, number>> {
   const sql = getSql()
   const result: Record<string, number> = {}
   if (!sql) return result
@@ -165,7 +174,7 @@ export async function getManualDailyDeposits(
       ? await sql`
           SELECT to_char(created_at, 'YYYY-MM-DD') as day, COALESCE(SUM(amount), 0) as total
           FROM manual_balance_logs
-          WHERE type = 'deposit'
+          WHERE type = ${type}
             AND target_username = ANY(${uniqueUsernames})
             AND created_at >= ${dateRange.start}
             AND created_at <= ${dateRange.end}
@@ -174,7 +183,7 @@ export async function getManualDailyDeposits(
       : await sql`
           SELECT to_char(created_at, 'YYYY-MM-DD') as day, COALESCE(SUM(amount), 0) as total
           FROM manual_balance_logs
-          WHERE type = 'deposit'
+          WHERE type = ${type}
             AND created_at >= ${dateRange.start}
             AND created_at <= ${dateRange.end}
           GROUP BY day
@@ -184,7 +193,7 @@ export async function getManualDailyDeposits(
     }
     return result
   } catch (err) {
-    console.warn("[manual-balance] getManualDailyDeposits error:", err)
+    console.warn("[manual-balance] getManualDailyTotals error:", err)
     return result
   }
 }
