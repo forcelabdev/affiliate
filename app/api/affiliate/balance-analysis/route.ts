@@ -6,11 +6,11 @@ import { neon } from "@neondatabase/serverless"
 
 // Sabit başlangıç noktası: 04/08/2026 18:20 (Türkiye saati = UTC+3 => 15:20 UTC)
 const AGENT_BALANCE_ORIGIN = new Date("2026-08-04T15:20:00.000Z")
-const AGENT_BALANCE_INITIAL = 1_010_000
+const AGENT_BALANCE_INITIAL = 1_010_000 + 1_197_200
 
 // Bonus bakiye: 31.07.2026 00:00 Türkiye saati = 30.07.2026 21:00 UTC
 const BONUS_BALANCE_ORIGIN  = new Date("2026-07-30T21:00:00.000Z")
-const BONUS_BALANCE_INITIAL = 2_600_000
+const BONUS_BALANCE_INITIAL = 2_600_000 + 1_197_200
 
 export async function GET(req: NextRequest) {
   try {
